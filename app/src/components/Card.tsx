@@ -17,7 +17,7 @@ function createStyles(colors: ColorPalette) {
       borderColor: colors.border,
       padding: spacing.md,
       marginBottom: spacing.sm,
-      // deliberately no borderRadius -- flat, sharp-edged design
+      // deliberately no borderRadius - flat, sharp-edged design
     },
   });
 }

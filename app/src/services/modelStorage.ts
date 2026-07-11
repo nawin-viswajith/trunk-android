@@ -1,3 +1,6 @@
+// Copyright © 2026 TuskerLabs. All rights reserved.
+// Unauthorized copying of this file, via any medium, is strictly prohibited.
+
 import * as FileSystem from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
 import { quantFromFilename } from "../utils/quant";
@@ -7,6 +10,7 @@ export interface LocalModel {
   path: string;
   sizeBytes: number;
   quant: string | null;
+  addedAt: number;
 }
 
 const MODELS_DIR = `${FileSystem.documentDirectory}models/`;
@@ -34,6 +38,7 @@ export async function listLocalModels(): Promise<LocalModel[]> {
       path: modelPath(filename),
       sizeBytes: info.exists && !info.isDirectory ? info.size : 0,
       quant: quantFromFilename(filename),
+      addedAt: info.exists && !info.isDirectory ? info.modificationTime * 1000 : 0,
     });
   }
   return models;
@@ -103,6 +108,7 @@ export async function importModelFromDevice(): Promise<LocalModel | null> {
     path: destination,
     sizeBytes: info.exists && !info.isDirectory ? info.size : 0,
     quant: quantFromFilename(asset.name),
+    addedAt: info.exists && !info.isDirectory ? info.modificationTime * 1000 : 0,
   };
 }
 

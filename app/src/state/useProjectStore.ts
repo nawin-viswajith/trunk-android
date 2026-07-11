@@ -15,14 +15,40 @@ export interface Project {
   updatedAt: number;
 }
 
+export interface ChatSession {
+  id: string;
+  projectId: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface HistoryEntry {
   id: string;
   projectId: string;
+  /** Absent on entries saved before multi-session chat existed; treat as
+   * "not yet migrated" -- ensureDefaultSession() backfills these once. */
+  sessionId?: string;
   prompt: string;
   response: string;
   tokensGenerated: number;
   tokensPerSecond: number;
+  promptTokens: number;
+  promptTokensPerSecond: number;
+  totalMs: number;
   timestamp: number;
+}
+
+export interface NewHistoryEntry {
+  projectId: string;
+  sessionId: string;
+  prompt: string;
+  response: string;
+  tokensGenerated: number;
+  tokensPerSecond: number;
+  promptTokens: number;
+  promptTokensPerSecond: number;
+  totalMs: number;
 }
 
 function randomId(): string {
@@ -31,23 +57,24 @@ function randomId(): string {
 
 interface ProjectState {
   projects: Project[];
+  sessions: ChatSession[];
   history: HistoryEntry[];
   createProject: (name: string, modelFilename?: string | null) => Project;
   updateProject: (id: string, patch: Partial<Omit<Project, "id" | "createdAt">>) => void;
   deleteProject: (id: string) => void;
-  addHistoryEntry: (
-    projectId: string,
-    prompt: string,
-    response: string,
-    tokensGenerated: number,
-    tokensPerSecond: number
-  ) => void;
+  createSession: (projectId: string, name?: string) => ChatSession;
+  deleteSession: (sessionId: string) => void;
+  /** Returns the most recently used session for a project, creating one
+   * (and migrating any pre-multi-session history into it) if none exist. */
+  ensureDefaultSession: (projectId: string) => ChatSession;
+  addHistoryEntry: (entry: NewHistoryEntry) => void;
 }
 
 export const useProjectStore = create<ProjectState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       projects: [],
+      sessions: [],
       history: [],
 
       createProject: (name, modelFilename = null) => {
@@ -77,21 +104,53 @@ export const useProjectStore = create<ProjectState>()(
       deleteProject: (id) => {
         set((state) => ({
           projects: state.projects.filter((p) => p.id !== id),
+          sessions: state.sessions.filter((s) => s.projectId !== id),
           history: state.history.filter((h) => h.projectId !== id),
         }));
       },
 
-      addHistoryEntry: (projectId, prompt, response, tokensGenerated, tokensPerSecond) => {
-        const entry: HistoryEntry = {
+      createSession: (projectId, name) => {
+        const now = Date.now();
+        const count = get().sessions.filter((s) => s.projectId === projectId).length;
+        const session: ChatSession = {
           id: randomId(),
           projectId,
-          prompt,
-          response,
-          tokensGenerated,
-          tokensPerSecond,
-          timestamp: Date.now(),
+          name: name ?? `Chat ${count + 1}`,
+          createdAt: now,
+          updatedAt: now,
         };
-        set((state) => ({ history: [entry, ...state.history] }));
+        set((state) => ({ sessions: [...state.sessions, session] }));
+        return session;
+      },
+
+      deleteSession: (sessionId) => {
+        set((state) => ({
+          sessions: state.sessions.filter((s) => s.id !== sessionId),
+          history: state.history.filter((h) => h.sessionId !== sessionId),
+        }));
+      },
+
+      ensureDefaultSession: (projectId) => {
+        const existing = get()
+          .sessions.filter((s) => s.projectId === projectId)
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        if (existing.length > 0) return existing[0];
+
+        const now = Date.now();
+        const session: ChatSession = { id: randomId(), projectId, name: "Chat 1", createdAt: now, updatedAt: now };
+        set((state) => ({
+          sessions: [...state.sessions, session],
+          history: state.history.map((h) => (h.projectId === projectId && !h.sessionId ? { ...h, sessionId: session.id } : h)),
+        }));
+        return session;
+      },
+
+      addHistoryEntry: (entry) => {
+        const stored: HistoryEntry = { id: randomId(), timestamp: Date.now(), ...entry };
+        set((state) => ({
+          history: [stored, ...state.history],
+          sessions: state.sessions.map((s) => (s.id === entry.sessionId ? { ...s, updatedAt: stored.timestamp } : s)),
+        }));
       },
     }),
     {
@@ -107,4 +166,12 @@ export function selectProject(projects: Project[], id: string): Project | undefi
 
 export function selectHistoryForProject(history: HistoryEntry[], projectId: string): HistoryEntry[] {
   return history.filter((h) => h.projectId === projectId);
+}
+
+export function selectSessionsForProject(sessions: ChatSession[], projectId: string): ChatSession[] {
+  return sessions.filter((s) => s.projectId === projectId).sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export function selectHistoryForSession(history: HistoryEntry[], sessionId: string): HistoryEntry[] {
+  return history.filter((h) => h.sessionId === sessionId);
 }

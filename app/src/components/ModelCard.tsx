@@ -1,66 +1,72 @@
 import React, { useMemo } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { CheckIndicator } from "./CheckIndicator";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 import { LocalModel } from "../services/modelStorage";
-import { formatBytes } from "../utils/format";
-import { Button } from "./Button";
+import { formatBytes, formatDate } from "../utils/format";
 
 interface ModelCardProps {
   model: LocalModel;
-  onDelete: () => void;
+  onPress: () => void;
+  onLongPress?: () => void;
+  onToggleSelect?: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
 }
 
-export function ModelCard({ model, onDelete }: ModelCardProps) {
+export function ModelCard({ model, onPress, onLongPress, onToggleSelect, selectionMode, selected }: ModelCardProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <View style={styles.card}>
-      <View style={styles.headerRow}>
+    <Pressable
+      onPress={selectionMode ? onToggleSelect : onPress}
+      onLongPress={onLongPress}
+      style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && styles.cardPressed]}
+    >
+      <View style={styles.textWrap}>
         <Text style={styles.name} numberOfLines={1}>
           {model.filename}
         </Text>
+        <Text style={styles.meta}>
+          {[model.quant, formatBytes(model.sizeBytes), formatDate(model.addedAt)].filter(Boolean).join(" · ")}
+        </Text>
       </View>
-      <Text style={styles.meta}>{[model.quant, formatBytes(model.sizeBytes)].filter(Boolean).join(" · ")}</Text>
-      <View style={styles.actions}>
-        <Button label="Delete" onPress={onDelete} variant="danger" />
-      </View>
-    </View>
+      {selectionMode ? <CheckIndicator checked={!!selected} /> : null}
+    </Pressable>
   );
 }
 
 function createStyles(colors: ColorPalette) {
   return StyleSheet.create({
     card: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       borderWidth: 1,
       borderColor: colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accentTertiary,
       backgroundColor: colors.surface,
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
-    headerRow: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: spacing.xs,
-    },
+    cardSelected: { borderColor: colors.accent, backgroundColor: colors.accent + "18" },
+    cardPressed: { backgroundColor: colors.surfaceAlt },
+    textWrap: { flex: 1, marginRight: spacing.sm },
     name: {
       color: colors.textPrimary,
       fontWeight: "600",
       fontSize: 14,
-      flexShrink: 1,
-      marginRight: spacing.sm,
       fontFamily: "monospace",
+      marginBottom: spacing.xs,
     },
     meta: {
       color: colors.textSecondary,
       fontSize: 12,
       fontFamily: "monospace",
-      marginBottom: spacing.sm,
     },
-    actions: {
-      flexDirection: "row",
-      gap: spacing.sm,
-    },
+    trashButton: { padding: spacing.xs },
+    trashButtonPressed: { opacity: 0.6 },
   });
 }

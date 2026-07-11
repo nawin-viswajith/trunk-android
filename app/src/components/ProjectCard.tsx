@@ -1,16 +1,32 @@
 import React, { useMemo } from "react";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { CheckIndicator } from "./CheckIndicator";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 import { Project } from "../state/useProjectStore";
 
-export function ProjectCard({ project, onPress }: { project: Project; onPress: () => void }) {
+interface ProjectCardProps {
+  project: Project;
+  onPress: () => void;
+  onLongPress?: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+}
+
+export function ProjectCard({ project, onPress, onLongPress, selectionMode, selected }: ProjectCardProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
-      <Text style={styles.name}>{project.name}</Text>
-      <Text style={styles.meta}>{project.modelFilename ?? "No model assigned"}</Text>
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && styles.pressed]}
+    >
+      <View style={styles.textWrap}>
+        <Text style={styles.name}>{project.name}</Text>
+        <Text style={styles.meta}>{project.modelFilename ?? "No model assigned"}</Text>
+      </View>
+      {selectionMode ? <CheckIndicator checked={!!selected} /> : null}
     </Pressable>
   );
 }
@@ -18,12 +34,19 @@ export function ProjectCard({ project, onPress }: { project: Project; onPress: (
 function createStyles(colors: ColorPalette) {
   return StyleSheet.create({
     card: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
       borderWidth: 1,
       borderColor: colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accentTertiary,
       backgroundColor: colors.surface,
       padding: spacing.md,
       marginBottom: spacing.sm,
     },
+    cardSelected: { borderColor: colors.accent, backgroundColor: colors.accent + "18" },
+    textWrap: { flex: 1, marginRight: spacing.sm },
     pressed: {
       backgroundColor: colors.surfaceAlt,
     },

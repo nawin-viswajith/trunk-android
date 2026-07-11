@@ -1,23 +1,24 @@
 {
   "expo": {
-    "name": "PocketCoder",
-    "slug": "pocketcoder",
+    "name": "Trunk",
+    "slug": "trunk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tuskerlabs.trunk"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0B0D10",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.pocketcoder"
+      "package": "com.tuskerlabs.trunk"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -30,6 +31,15 @@
           "enableEntitlements": false,
           "forceCxx20": true,
           "enableOpenCLAndHexagon": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
         }
       ]
     ]

@@ -2,7 +2,7 @@ import DeviceInfo from "react-native-device-info";
 
 /**
  * Estimates whether a GGUF model will fit in this phone's RAM. A heuristic,
- * not an exact model -- llama.cpp's actual runtime memory use depends on
+ * not an exact model - llama.cpp's actual runtime memory use depends on
  * architecture details we don't have without downloading the file. Mirrors
  * the thresholds used by the (now-removed) backend compatibility_service.py.
  */
@@ -49,7 +49,7 @@ async function getDeviceMemory(): Promise<{ totalMb: number; availableMb: number
 
 // Empirical, not a physical law: derived from a real Qwen2.5-Coder-7B Q4_0
 // GGUF (4,431,390,720 bytes / 7B params ~= 604 MB per billion params at Q4).
-// Other quantizations/architectures will vary -- this is only for the
+// Other quantizations/architectures will vary - this is only for the
 // proactive "suggested model size" indicator, not the per-file compatibility
 // check above (which always uses the file's real size once known).
 const MB_PER_BILLION_PARAMS_Q4 = 604;
@@ -65,7 +65,7 @@ export async function getDeviceMemoryInfo(): Promise<{ totalMb: number; availabl
   return getDeviceMemory();
 }
 
-/** "Your device can comfortably run up to ~N B models (Q4)" -- the inverse of
+/** "Your device can comfortably run up to ~N B models (Q4)" - the inverse of
  * estimateRequiredMb/categorize: the largest file size that would still land
  * in the "supported" tier on this device. */
 export async function getSuggestedModelBudget(): Promise<SuggestedModelBudget | null> {
@@ -91,15 +91,15 @@ export async function checkCompatibility(fileSizeBytes: number): Promise<Compati
       requiredMb,
       availableMb: null,
       totalMb: null,
-      message: "Could not read device memory -- proceed with caution.",
+      message: "Could not read device memory - proceed with caution.",
     };
   }
 
   const category = categorize(requiredMb, memory.availableMb);
   const messages: Record<Exclude<CompatibilityCategory, "unknown">, string> = {
-    supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB available -- comfortable fit.`,
-    can_bottleneck: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB available -- will likely run but expect slowdowns or other apps getting closed.`,
-    not_supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, only ${memory.availableMb.toFixed(0)} MB available -- likely to crash from out-of-memory.`,
+    supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB available - comfortable fit.`,
+    can_bottleneck: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB available - will likely run but expect slowdowns or other apps getting closed.`,
+    not_supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, only ${memory.availableMb.toFixed(0)} MB available - likely to crash from out-of-memory.`,
   };
 
   return {

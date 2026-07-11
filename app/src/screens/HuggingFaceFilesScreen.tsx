@@ -3,6 +3,7 @@ import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
 import { Button } from "../components/Button";
 import { StatusBadge } from "../components/StatusBadge";
 import { ColorPalette, spacing } from "../theme/colors";
+import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi, HfFileSummary } from "../api/huggingface";
 import { checkCompatibility, CompatibilityInfo } from "../utils/compatibility";
@@ -88,7 +89,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
 
     if (category === "not_supported") {
       // Two-step confirmation for the risky tier: an initial warning, then a
-      // second, harder confirmation spelling out concrete consequences --
+      // second, harder confirmation spelling out concrete consequences -
       // proceeding past this point is an explicit, informed choice.
       Alert.alert("This will likely crash from OOM", `${file.filename}\n\n${file.compatibility.message}`, [
         { text: "Cancel", style: "cancel" },
@@ -106,7 +107,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
 
   const confirmRiskyDownloadFinal = (file: FileRow) => {
     Alert.alert(
-      "Last chance -- this is risky",
+      "Last chance - this is risky",
       "Running this model can cause:\n\n" +
         "- The app crashing or being killed by Android (out-of-memory)\n" +
         "- The whole phone slowing down or freezing temporarily\n" +
@@ -171,8 +172,9 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
 }
 
 function createStyles(colors: ColorPalette) {
+  const screen = createScreenStyles(colors);
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+    container: { ...screen.container, padding: spacing.md },
     title: { color: colors.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: spacing.sm },
     list: { paddingBottom: spacing.lg },
     card: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.sm },
@@ -181,10 +183,10 @@ function createStyles(colors: ColorPalette) {
     meta: { color: colors.textSecondary, fontSize: 12, fontFamily: "monospace", marginBottom: spacing.xs },
     compatMessage: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
     empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
-    progressCard: { borderWidth: 1, borderColor: colors.cpu, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.md },
+    progressCard: { borderWidth: 1, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.md },
     progressLabel: { color: colors.textPrimary, fontSize: 12, fontFamily: "monospace", marginBottom: spacing.xs },
     progressTrack: { height: 6, backgroundColor: colors.surfaceAlt, marginBottom: spacing.xs },
-    progressFill: { height: 6, backgroundColor: colors.cpu },
+    progressFill: { height: 6, backgroundColor: colors.accent },
     progressRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     progressText: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
   });
