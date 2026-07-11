@@ -4,9 +4,6 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/.pytest_cache/
 backend/**/.pytest_cache/
-backend/*.db
-backend/logs/*.log
-backend/workspace/models/*.gguf
 backend/.env
 *.pyc
 
