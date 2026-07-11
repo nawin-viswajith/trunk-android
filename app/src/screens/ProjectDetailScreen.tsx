@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
-import { colors, spacing } from "../theme/colors";
+import { ColorPalette, spacing } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { modelsApi } from "../api/models";
 import { projectsApi } from "../api/projects";
 import { HistoryEntry, ModelInfo, Project } from "../api/types";
 
 export function ProjectDetailScreen({ route, navigation }: any) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { projectId } = route.params;
   const [project, setProject] = useState<Project | null>(null);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -94,14 +97,16 @@ export function ProjectDetailScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md },
-  title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700", marginBottom: spacing.md },
-  sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: spacing.sm },
-  value: { color: colors.textSecondary, fontSize: 13, marginBottom: 2 },
-  modelList: { marginTop: spacing.sm, gap: 4 },
-  modelOption: { color: colors.textSecondary, fontSize: 13, paddingVertical: 4 },
-  modelOptionActive: { color: colors.cpu, fontWeight: "600" },
-  historyLine: { color: colors.textSecondary, fontSize: 12, marginBottom: 4, fontFamily: "monospace" },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: spacing.md },
+    title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700", marginBottom: spacing.md },
+    sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: spacing.sm },
+    value: { color: colors.textSecondary, fontSize: 13, marginBottom: 2 },
+    modelList: { marginTop: spacing.sm, gap: 4 },
+    modelOption: { color: colors.textSecondary, fontSize: 13, paddingVertical: 4 },
+    modelOptionActive: { color: colors.cpu, fontWeight: "600" },
+    historyLine: { color: colors.textSecondary, fontSize: 12, marginBottom: 4, fontFamily: "monospace" },
+  });
+}

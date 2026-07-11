@@ -1,14 +1,11 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors, spacing } from "../theme/colors";
+import { spacing, ColorPalette } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { ModelInfo } from "../api/types";
+import { formatBytes } from "../utils/format";
 import { Button } from "./Button";
 import { StatusBadge } from "./StatusBadge";
-
-function formatSize(bytes: number): string {
-  const gb = bytes / 1024 ** 3;
-  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1024 ** 2).toFixed(0)} MB`;
-}
 
 interface ModelCardProps {
   model: ModelInfo;
@@ -17,6 +14,8 @@ interface ModelCardProps {
 }
 
 export function ModelCard({ model, onPush, onDelete }: ModelCardProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.card}>
       <View style={styles.headerRow}>
@@ -27,7 +26,7 @@ export function ModelCard({ model, onPush, onDelete }: ModelCardProps) {
         />
       </View>
       <Text style={styles.meta}>
-        {[model.quant, formatSize(model.size_bytes), model.architecture, model.context_length ? `${model.context_length} ctx` : null]
+        {[model.quant, formatBytes(model.size_bytes), model.architecture, model.context_length ? `${model.context_length} ctx` : null]
           .filter(Boolean)
           .join(" · ")}
       </Text>
@@ -39,35 +38,37 @@ export function ModelCard({ model, onPush, onDelete }: ModelCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.xs,
-  },
-  name: {
-    color: colors.textPrimary,
-    fontWeight: "600",
-    fontSize: 14,
-    flexShrink: 1,
-    marginRight: spacing.sm,
-  },
-  meta: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    fontFamily: "monospace",
-    marginBottom: spacing.sm,
-  },
-  actions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    card: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    headerRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.xs,
+    },
+    name: {
+      color: colors.textPrimary,
+      fontWeight: "600",
+      fontSize: 14,
+      flexShrink: 1,
+      marginRight: spacing.sm,
+    },
+    meta: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontFamily: "monospace",
+      marginBottom: spacing.sm,
+    },
+    actions: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+  });
+}

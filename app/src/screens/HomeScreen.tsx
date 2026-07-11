@@ -1,14 +1,17 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Card } from "../components/Card";
 import { StatusBadge } from "../components/StatusBadge";
-import { colors, spacing } from "../theme/colors";
+import { spacing, ColorPalette } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { devicesApi } from "../api/devices";
 import { deploymentApi } from "../api/deployment";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { Device, WizardProgress } from "../api/types";
 
 export function HomeScreen({ navigation }: any) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const activeDeviceSerial = useSettingsStore((s) => s.activeDeviceSerial);
   const [devices, setDevices] = useState<Device[]>([]);
   const [progress, setProgress] = useState<WizardProgress | null>(null);
@@ -54,25 +57,35 @@ export function HomeScreen({ navigation }: any) {
           <Text style={styles.cardTitle}>Device Ready</Text>
           <StatusBadge status={ready ? "pass" : "warn"} label={ready ? "READY" : "SETUP NEEDED"} />
         </View>
-        <ChecklistLine label="Device connected" ok={!!device && device.state === "device"} />
-        <ChecklistLine label="Termux installed" ok={(progress?.statuses?.["1"] ?? null) === "pass"} />
-        <ChecklistLine label="llama.cpp deployed" ok={(progress?.statuses?.["3"] ?? null) === "pass"} />
-        <ChecklistLine label="Diagnostics passed" ok={(progress?.statuses?.["5"] ?? null) === "pass"} />
+        <ChecklistLine label="Device connected" ok={!!device && device.state === "device"} styles={styles} colors={colors} />
+        <ChecklistLine label="Termux installed" ok={(progress?.statuses?.["1"] ?? null) === "pass"} styles={styles} colors={colors} />
+        <ChecklistLine label="llama.cpp deployed" ok={(progress?.statuses?.["3"] ?? null) === "pass"} styles={styles} colors={colors} />
+        <ChecklistLine label="Diagnostics passed" ok={(progress?.statuses?.["5"] ?? null) === "pass"} styles={styles} colors={colors} />
       </Card>
 
       <Card>
         <Text style={styles.cardTitle}>Quick Actions</Text>
         <View style={styles.actionsRow}>
-          <QuickAction label="Deploy" onPress={() => navigation.navigate("Deployment Wizard")} />
-          <QuickAction label="Diagnostics" onPress={() => navigation.navigate("Diagnostics")} />
-          <QuickAction label="Inference" onPress={() => navigation.navigate("Inference")} />
+          <QuickAction label="Deploy" onPress={() => navigation.navigate("Deployment Wizard")} styles={styles} />
+          <QuickAction label="Diagnostics" onPress={() => navigation.navigate("Diagnostics")} styles={styles} />
+          <QuickAction label="Inference" onPress={() => navigation.navigate("Inference")} styles={styles} />
         </View>
       </Card>
     </ScrollView>
   );
 }
 
-function ChecklistLine({ label, ok }: { label: string; ok: boolean }) {
+function ChecklistLine({
+  label,
+  ok,
+  styles,
+  colors,
+}: {
+  label: string;
+  ok: boolean;
+  styles: ReturnType<typeof createStyles>;
+  colors: ColorPalette;
+}) {
   return (
     <View style={styles.checklistLine}>
       <Text style={[styles.checkMark, { color: ok ? colors.running : colors.textSecondary }]}>{ok ? "✔" : "○"}</Text>
@@ -81,7 +94,15 @@ function ChecklistLine({ label, ok }: { label: string; ok: boolean }) {
   );
 }
 
-function QuickAction({ label, onPress }: { label: string; onPress: () => void }) {
+function QuickAction({
+  label,
+  onPress,
+  styles,
+}: {
+  label: string;
+  onPress: () => void;
+  styles: ReturnType<typeof createStyles>;
+}) {
   return (
     <View style={styles.quickAction}>
       <Text onPress={onPress} style={styles.quickActionText}>
@@ -91,53 +112,55 @@ function QuickAction({ label, onPress }: { label: string; onPress: () => void })
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: spacing.md,
-  },
-  cardTitle: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: spacing.sm,
-  },
-  rowBetween: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  checklistLine: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  checkMark: {
-    width: 20,
-    fontFamily: "monospace",
-  },
-  checklistLabel: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  actionsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
-  },
-  quickAction: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  quickActionText: {
-    color: colors.cpu,
-    fontWeight: "600",
-    fontSize: 13,
-  },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: spacing.md },
+    title: {
+      color: colors.textPrimary,
+      fontSize: 24,
+      fontWeight: "700",
+      marginBottom: spacing.md,
+    },
+    cardTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+      marginBottom: spacing.sm,
+    },
+    rowBetween: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.sm,
+    },
+    checklistLine: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    checkMark: {
+      width: 20,
+      fontFamily: "monospace",
+    },
+    checklistLabel: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    actionsRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    quickAction: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+    },
+    quickActionText: {
+      color: colors.cpu,
+      fontWeight: "600",
+      fontSize: 13,
+    },
+  });
+}

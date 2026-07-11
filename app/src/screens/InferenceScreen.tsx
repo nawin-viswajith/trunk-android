@@ -1,14 +1,17 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button } from "../components/Button";
 import { TokenStreamView } from "../components/TokenStreamView";
-import { colors, spacing } from "../theme/colors";
+import { ColorPalette, spacing } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { inferenceApi } from "../api/inference";
 import { projectsApi } from "../api/projects";
 import { connectJsonWs } from "../api/ws";
 import { InferenceFrame, Project } from "../api/types";
 
 export function InferenceScreen({ route }: any) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const projectId: string | undefined = route?.params?.projectId;
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | undefined>(projectId);
@@ -88,22 +91,24 @@ export function InferenceScreen({ route }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
-  header: { marginBottom: spacing.sm },
-  title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  projectName: { color: colors.textSecondary, fontSize: 12 },
-  stats: { color: colors.running, fontSize: 12, fontFamily: "monospace", marginTop: spacing.xs },
-  promptRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, alignItems: "flex-end" },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.textPrimary,
-    backgroundColor: colors.surface,
-    padding: spacing.sm,
-    minHeight: 44,
-    maxHeight: 120,
-  },
-  warning: { color: colors.warning, fontSize: 12, marginTop: spacing.sm },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+    header: { marginBottom: spacing.sm },
+    title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    projectName: { color: colors.textSecondary, fontSize: 12 },
+    stats: { color: colors.running, fontSize: 12, fontFamily: "monospace", marginTop: spacing.xs },
+    promptRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, alignItems: "flex-end" },
+    input: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.textPrimary,
+      backgroundColor: colors.surface,
+      padding: spacing.sm,
+      minHeight: 44,
+      maxHeight: 120,
+    },
+    warning: { color: colors.warning, fontSize: 12, marginTop: spacing.sm },
+  });
+}

@@ -77,3 +77,32 @@ export type InferenceFrame =
   | { type: "error"; message: string };
 
 export type DiagnosticsFrame = { type: "check"; [key: string]: unknown } | { type: "done" };
+
+export type CompatibilityCategory = "supported" | "can_bottleneck" | "not_supported" | "unknown";
+
+export interface CompatibilityInfo {
+  category: CompatibilityCategory;
+  required_mb: number;
+  available_mb: number | null;
+  total_mb: number | null;
+  message: string;
+}
+
+export interface HfModelSummary {
+  repo_id: string;
+  downloads: number;
+  likes: number;
+}
+
+export interface HfGgufFile {
+  filename: string;
+  size_bytes: number;
+  quant: string | null;
+  compatibility: CompatibilityInfo;
+}
+
+export type HfDownloadFrame =
+  | { type: "progress"; downloaded_bytes: number; total_bytes: number }
+  | { type: "done"; downloaded_bytes: number; total_bytes: number }
+  | { type: "cancelled" }
+  | { type: "error"; message: string };

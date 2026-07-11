@@ -1,6 +1,7 @@
 import React from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
-import { colors, spacing } from "../theme/colors";
+import { spacing } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 
 interface ButtonProps {
   label: string;
@@ -10,13 +11,13 @@ interface ButtonProps {
   loading?: boolean;
 }
 
-const VARIANT_COLOR: Record<string, string> = {
-  primary: colors.cpu,
-  secondary: colors.border,
-  danger: colors.error,
-};
-
 export function Button({ label, onPress, variant = "primary", disabled, loading }: ButtonProps) {
+  const colors = useColors();
+  const VARIANT_COLOR: Record<string, string> = {
+    primary: colors.cpu,
+    secondary: colors.border,
+    danger: colors.error,
+  };
   const color = VARIANT_COLOR[variant];
   return (
     <Pressable

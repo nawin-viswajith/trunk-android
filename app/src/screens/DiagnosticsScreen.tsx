@@ -1,14 +1,17 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Button } from "../components/Button";
 import { DoctorCheckRow } from "../components/DoctorCheckRow";
-import { colors, spacing } from "../theme/colors";
+import { spacing, ColorPalette } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { diagnosticsApi } from "../api/diagnostics";
 import { connectJsonWs } from "../api/ws";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { CheckResult, DiagnosticsFrame } from "../api/types";
 
 export function DiagnosticsScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const serial = useSettingsStore((s) => s.activeDeviceSerial);
   const [checks, setChecks] = useState<CheckResult[]>([]);
   const [running, setRunning] = useState(false);
@@ -46,15 +49,17 @@ export function DiagnosticsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    padding: spacing.md,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
-  empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      padding: spacing.md,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    list: { paddingHorizontal: spacing.md, paddingBottom: spacing.lg },
+    empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
+  });
+}

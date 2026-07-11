@@ -1,18 +1,22 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors } from "../theme/colors";
-
-const STATUS_COLOR: Record<string, string> = {
-  pass: colors.running,
-  running: colors.running,
-  fail: colors.error,
-  error: colors.error,
-  warn: colors.warning,
-  warning: colors.warning,
-  skipped: colors.textSecondary,
-};
+import { useColors } from "../theme/ThemeContext";
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const colors = useColors();
+  const STATUS_COLOR: Record<string, string> = {
+    pass: colors.running,
+    running: colors.running,
+    supported: colors.running,
+    fail: colors.error,
+    error: colors.error,
+    not_supported: colors.error,
+    warn: colors.warning,
+    warning: colors.warning,
+    can_bottleneck: colors.warning,
+    skipped: colors.textSecondary,
+    unknown: colors.textSecondary,
+  };
   const color = STATUS_COLOR[status] ?? colors.textSecondary;
   return (
     <View style={[styles.badge, { borderColor: color }]}>

@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from app.core.ring_buffer import broadcaster
 from app.routers.deployment import step_broadcaster
 from app.routers.diagnostics import check_broadcaster
+from app.services.huggingface_service import download_broadcaster
 from app.services.inference_service import frame_broadcaster
 from app.services.log_service import GLOBAL_CHANNEL
 
@@ -82,3 +83,24 @@ async def ws_inference(websocket: WebSocket, job_id: str) -> None:
         pass
     finally:
         await frame_broadcaster.unsubscribe(job_id, queue)
+
+
+@router.websocket("/huggingface/{job_id}")
+async def ws_huggingface_download(websocket: WebSocket, job_id: str) -> None:
+    await websocket.accept()
+    terminal_types = {"done", "error", "cancelled"}
+    for item in download_broadcaster.history(job_id):
+        await websocket.send_json(item)
+        if item.get("type") in terminal_types:
+            return
+    queue = await download_broadcaster.subscribe(job_id)
+    try:
+        while True:
+            item = await queue.get()
+            await websocket.send_json(item)
+            if item.get("type") in terminal_types:
+                break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await download_broadcaster.unsubscribe(job_id, queue)

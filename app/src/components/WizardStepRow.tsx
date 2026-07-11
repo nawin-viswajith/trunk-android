@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { colors, spacing } from "../theme/colors";
+import { spacing, ColorPalette } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { CheckStatus } from "../api/types";
 import { Button } from "./Button";
 import { StatusBadge } from "./StatusBadge";
@@ -14,6 +15,8 @@ interface WizardStepRowProps {
 }
 
 export function WizardStepRow({ index, title, status, running, onRun }: WizardStepRowProps) {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <View style={styles.left}>
@@ -28,37 +31,39 @@ export function WizardStepRow({ index, title, status, running, onRun }: WizardSt
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  left: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexShrink: 1,
-  },
-  index: {
-    color: colors.textSecondary,
-    fontFamily: "monospace",
-    marginRight: spacing.sm,
-    fontSize: 14,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "600",
-    flexShrink: 1,
-  },
-  right: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    left: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexShrink: 1,
+    },
+    index: {
+      color: colors.textSecondary,
+      fontFamily: "monospace",
+      marginRight: spacing.sm,
+      fontSize: 14,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+      flexShrink: 1,
+    },
+    right: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+  });
+}

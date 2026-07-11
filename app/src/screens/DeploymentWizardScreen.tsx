@@ -1,13 +1,16 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { WizardStepRow } from "../components/WizardStepRow";
-import { colors, spacing } from "../theme/colors";
+import { spacing, ColorPalette } from "../theme/colors";
+import { useColors } from "../theme/ThemeContext";
 import { deploymentApi } from "../api/deployment";
 import { connectJsonWs } from "../api/ws";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { CheckStatus, WizardProgress } from "../api/types";
 
 export function DeploymentWizardScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const serial = useSettingsStore((s) => s.activeDeviceSerial);
   const [progress, setProgress] = useState<WizardProgress | null>(null);
   const [runningStep, setRunningStep] = useState<number | null>(null);
@@ -59,11 +62,13 @@ export function DeploymentWizardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md },
-  title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
-  subtitle: { color: colors.textSecondary, fontSize: 13, marginBottom: spacing.md },
-  empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg, padding: spacing.md },
-  ready: { color: colors.running, fontWeight: "600", marginTop: spacing.sm },
-});
+function createStyles(colors: ColorPalette) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    content: { padding: spacing.md },
+    title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700" },
+    subtitle: { color: colors.textSecondary, fontSize: 13, marginBottom: spacing.md },
+    empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg, padding: spacing.md },
+    ready: { color: colors.running, fontWeight: "600", marginTop: spacing.sm },
+  });
+}
