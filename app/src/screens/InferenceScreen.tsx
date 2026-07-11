@@ -4,59 +4,66 @@ import { Button } from "../components/Button";
 import { TokenStreamView } from "../components/TokenStreamView";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
-import { inferenceApi } from "../api/inference";
-import { projectsApi } from "../api/projects";
-import { connectJsonWs } from "../api/ws";
-import { InferenceFrame, Project } from "../api/types";
+import { useProjectStore, selectProject } from "../state/useProjectStore";
+import { modelPath, isModelDownloaded } from "../services/modelStorage";
+import { ensureLoaded, complete } from "../services/llamaEngine";
 
 export function InferenceScreen({ route }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const projectId: string | undefined = route?.params?.projectId;
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string | undefined>(projectId);
+  const projectIdParam: string | undefined = route?.params?.projectId;
+
+  const projects = useProjectStore((s) => s.projects);
+  const addHistoryEntry = useProjectStore((s) => s.addHistoryEntry);
+  const [activeProjectId, setActiveProjectId] = useState<string | undefined>(projectIdParam);
   const [prompt, setPrompt] = useState("");
   const [output, setOutput] = useState("");
   const [running, setRunning] = useState(false);
-  const [stats, setStats] = useState<{ tokens: number; tok_per_sec: number } | null>(null);
-
-  const load = useCallback(async () => {
-    const list = await projectsApi.list();
-    setProjects(list);
-    if (!activeProjectId && list.length > 0) setActiveProjectId(list[0].id);
-  }, [activeProjectId]);
+  const [stats, setStats] = useState<{ tokens: number; tokPerSec: number } | null>(null);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (!activeProjectId && projects.length > 0) setActiveProjectId(projects[0].id);
+  }, [activeProjectId, projects]);
 
-  const activeProject = projects.find((p) => p.id === activeProjectId);
+  const activeProject = useProjectStore((s) => (activeProjectId ? selectProject(s.projects, activeProjectId) : undefined));
 
-  const send = async () => {
-    if (!activeProjectId || !prompt.trim()) return;
+  const send = useCallback(async () => {
+    if (!activeProject?.modelFilename || !prompt.trim()) return;
+    const trimmedPrompt = prompt.trim();
     setOutput("");
     setStats(null);
     setRunning(true);
     try {
-      const { job_id } = await inferenceApi.start(activeProjectId, prompt.trim());
-      const disconnect = connectJsonWs<InferenceFrame>(`/ws/inference/${job_id}`, (frame) => {
-        if (frame.type === "token") {
-          setOutput((prev) => prev + frame.text);
-        } else if (frame.type === "done") {
-          setStats({ tokens: frame.tokens, tok_per_sec: frame.tok_per_sec });
-          setRunning(false);
-          disconnect();
-        } else if (frame.type === "error") {
-          Alert.alert("Inference error", frame.message);
-          setRunning(false);
-          disconnect();
+      if (!(await isModelDownloaded(activeProject.modelFilename))) {
+        Alert.alert("Model not found", "This project's model is no longer downloaded. Assign a different one.");
+        return;
+      }
+
+      await ensureLoaded(modelPath(activeProject.modelFilename), { contextLength: activeProject.contextLength });
+
+      let fullText = "";
+      const result = await complete(
+        {
+          messages: [{ role: "user", content: trimmedPrompt }],
+          temperature: activeProject.temperature,
+          topP: activeProject.topP,
+          topK: activeProject.topK,
+          maxTokens: activeProject.maxTokens,
+        },
+        (token) => {
+          fullText += token;
+          setOutput(fullText);
         }
-      });
+      );
+
+      setStats({ tokens: result.tokens, tokPerSec: result.tokensPerSecond });
+      addHistoryEntry(activeProject.id, trimmedPrompt, result.text, result.tokens, result.tokensPerSecond);
     } catch (err) {
-      Alert.alert("Could not start inference", String(err));
+      Alert.alert("Inference error", String(err));
+    } finally {
       setRunning(false);
     }
-  };
+  }, [activeProject, prompt, addHistoryEntry]);
 
   return (
     <View style={styles.container}>
@@ -69,7 +76,7 @@ export function InferenceScreen({ route }: any) {
 
       {stats ? (
         <Text style={styles.stats}>
-          {stats.tokens} tokens · {stats.tok_per_sec.toFixed(1)} tok/s
+          {stats.tokens} tokens · {stats.tokPerSec.toFixed(1)} tok/s
         </Text>
       ) : null}
 
@@ -82,9 +89,9 @@ export function InferenceScreen({ route }: any) {
           style={styles.input}
           multiline
         />
-        <Button label="Send" onPress={send} loading={running} disabled={!activeProject?.model_filename} />
+        <Button label="Send" onPress={send} loading={running} disabled={!activeProject?.modelFilename} />
       </View>
-      {!activeProject?.model_filename ? (
+      {!activeProject?.modelFilename ? (
         <Text style={styles.warning}>Assign a model to this project first (Projects tab).</Text>
       ) : null}
     </View>

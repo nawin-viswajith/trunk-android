@@ -4,46 +4,40 @@ import { Button } from "../components/Button";
 import { Card } from "../components/Card";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
-import { modelsApi } from "../api/models";
-import { projectsApi } from "../api/projects";
-import { HistoryEntry, ModelInfo, Project } from "../api/types";
+import { useProjectStore, selectProject, selectHistoryForProject } from "../state/useProjectStore";
+import { listLocalModels, LocalModel } from "../services/modelStorage";
 
 export function ProjectDetailScreen({ route, navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { projectId } = route.params;
-  const [project, setProject] = useState<Project | null>(null);
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+
+  const project = useProjectStore((s) => selectProject(s.projects, projectId));
+  const history = useProjectStore((s) => selectHistoryForProject(s.history, projectId));
+  const updateProject = useProjectStore((s) => s.updateProject);
+  const deleteProject = useProjectStore((s) => s.deleteProject);
+  const [models, setModels] = useState<LocalModel[]>([]);
 
   const load = useCallback(async () => {
-    const [p, m, h] = await Promise.all([
-      projectsApi.get(projectId),
-      modelsApi.list(),
-      projectsApi.history(projectId),
-    ]);
-    setProject(p);
-    setModels(m);
-    setHistory(h);
-  }, [projectId]);
+    setModels(await listLocalModels());
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const assignModel = async (filename: string) => {
-    await projectsApi.update(projectId, { model_filename: filename });
-    await load();
+  const assignModel = (filename: string) => {
+    updateProject(projectId, { modelFilename: filename });
   };
 
-  const remove = async () => {
+  const remove = () => {
     Alert.alert("Delete project", "This cannot be undone.", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
         style: "destructive",
-        onPress: async () => {
-          await projectsApi.remove(projectId);
+        onPress: () => {
+          deleteProject(projectId);
           navigation.goBack();
         },
       },
@@ -58,33 +52,33 @@ export function ProjectDetailScreen({ route, navigation }: any) {
 
       <Card>
         <Text style={styles.sectionTitle}>Model</Text>
-        <Text style={styles.value}>{project.model_filename ?? "None assigned"}</Text>
+        <Text style={styles.value}>{project.modelFilename ?? "None assigned"}</Text>
         <View style={styles.modelList}>
           {models.map((m) => (
             <Text
               key={m.filename}
               onPress={() => assignModel(m.filename)}
-              style={[styles.modelOption, m.filename === project.model_filename && styles.modelOptionActive]}
+              style={[styles.modelOption, m.filename === project.modelFilename && styles.modelOptionActive]}
             >
               {m.filename}
             </Text>
           ))}
+          {models.length === 0 ? <Text style={styles.value}>No models downloaded yet (Models tab).</Text> : null}
         </View>
       </Card>
 
       <Card>
         <Text style={styles.sectionTitle}>Inference Parameters</Text>
         <Text style={styles.value}>Temperature: {project.temperature}</Text>
-        <Text style={styles.value}>Top P: {project.top_p} · Top K: {project.top_k}</Text>
-        <Text style={styles.value}>Threads: {project.threads} · Context: {project.context_length}</Text>
-        <Text style={styles.value}>Batch: {project.batch_size} · Max tokens: {project.max_tokens}</Text>
+        <Text style={styles.value}>Top P: {project.topP} · Top K: {project.topK}</Text>
+        <Text style={styles.value}>Context: {project.contextLength} · Max tokens: {project.maxTokens}</Text>
       </Card>
 
       <Card>
         <Text style={styles.sectionTitle}>History ({history.length})</Text>
         {history.slice(0, 5).map((h) => (
           <Text key={h.id} style={styles.historyLine} numberOfLines={2}>
-            {h.prompt} -- {h.tokens_generated} tok @ {h.tokens_per_sec.toFixed(1)} tok/s
+            {h.prompt} -- {h.tokensGenerated} tok @ {h.tokensPerSecond.toFixed(1)} tok/s
           </Text>
         ))}
         {history.length === 0 ? <Text style={styles.value}>No inference runs yet.</Text> : null}
@@ -105,7 +99,7 @@ function createStyles(colors: ColorPalette) {
     sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: spacing.sm },
     value: { color: colors.textSecondary, fontSize: 13, marginBottom: 2 },
     modelList: { marginTop: spacing.sm, gap: 4 },
-    modelOption: { color: colors.textSecondary, fontSize: 13, paddingVertical: 4 },
+    modelOption: { color: colors.textSecondary, fontSize: 13, paddingVertical: 4, fontFamily: "monospace" },
     modelOptionActive: { color: colors.cpu, fontWeight: "600" },
     historyLine: { color: colors.textSecondary, fontSize: 12, marginBottom: 4, fontFamily: "monospace" },
   });

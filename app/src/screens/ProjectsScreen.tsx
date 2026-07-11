@@ -1,35 +1,22 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { FlatList, StyleSheet, Text, TextInput, View } from "react-native";
 import { Button } from "../components/Button";
 import { ProjectCard } from "../components/ProjectCard";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
-import { projectsApi } from "../api/projects";
-import { Project } from "../api/types";
+import { useProjectStore } from "../state/useProjectStore";
 
 export function ProjectsScreen({ navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const projects = useProjectStore((s) => s.projects);
+  const createProject = useProjectStore((s) => s.createProject);
   const [newName, setNewName] = useState("");
 
-  const load = useCallback(async () => {
-    setProjects(await projectsApi.list());
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const create = async () => {
+  const create = () => {
     if (!newName.trim()) return;
-    try {
-      await projectsApi.create({ name: newName.trim() });
-      setNewName("");
-      await load();
-    } catch (err) {
-      Alert.alert("Could not create project", String(err));
-    }
+    createProject(newName.trim());
+    setNewName("");
   };
 
   return (

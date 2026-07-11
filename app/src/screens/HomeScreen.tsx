@@ -1,95 +1,80 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import DeviceInfo from "react-native-device-info";
 import { Card } from "../components/Card";
-import { StatusBadge } from "../components/StatusBadge";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
-import { devicesApi } from "../api/devices";
-import { deploymentApi } from "../api/deployment";
-import { useSettingsStore } from "../state/useSettingsStore";
-import { Device, WizardProgress } from "../api/types";
+import { useProjectStore } from "../state/useProjectStore";
+import { getTotalStorageUsed, listLocalModels } from "../services/modelStorage";
+import { getSuggestedModelBudget, SuggestedModelBudget } from "../utils/compatibility";
+import { formatBytes } from "../utils/format";
 
 export function HomeScreen({ navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const activeDeviceSerial = useSettingsStore((s) => s.activeDeviceSerial);
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [progress, setProgress] = useState<WizardProgress | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const projectCount = useProjectStore((s) => s.projects.length);
+  const [modelCount, setModelCount] = useState(0);
+  const [storageUsed, setStorageUsed] = useState(0);
+  const [budget, setBudget] = useState<SuggestedModelBudget | null>(null);
 
   const load = useCallback(async () => {
-    try {
-      const list = await devicesApi.list();
-      setDevices(list);
-      const serial = activeDeviceSerial ?? list[0]?.serial;
-      if (serial) {
-        const p = await deploymentApi.progress(serial);
-        setProgress(p);
-      }
-    } catch {
-      // backend not reachable yet -- surfaced as "not ready" below
-    }
-  }, [activeDeviceSerial]);
+    const [models, used, suggested] = await Promise.all([
+      listLocalModels(),
+      getTotalStorageUsed(),
+      getSuggestedModelBudget(),
+    ]);
+    setModelCount(models.length);
+    setStorageUsed(used);
+    setBudget(suggested);
+  }, []);
 
   useEffect(() => {
     load();
-  }, [load]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
-  };
-
-  const device = devices.find((d) => d.serial === activeDeviceSerial) ?? devices[0];
-  const ready = progress?.ready ?? false;
+    const unsubscribe = navigation.addListener("focus", load);
+    return unsubscribe;
+  }, [navigation, load]);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.textPrimary} />}
-    >
+    <View style={styles.container}>
       <Text style={styles.title}>PocketCoder</Text>
 
       <Card>
-        <View style={styles.rowBetween}>
-          <Text style={styles.cardTitle}>Device Ready</Text>
-          <StatusBadge status={ready ? "pass" : "warn"} label={ready ? "READY" : "SETUP NEEDED"} />
-        </View>
-        <ChecklistLine label="Device connected" ok={!!device && device.state === "device"} styles={styles} colors={colors} />
-        <ChecklistLine label="Termux installed" ok={(progress?.statuses?.["1"] ?? null) === "pass"} styles={styles} colors={colors} />
-        <ChecklistLine label="llama.cpp deployed" ok={(progress?.statuses?.["3"] ?? null) === "pass"} styles={styles} colors={colors} />
-        <ChecklistLine label="Diagnostics passed" ok={(progress?.statuses?.["5"] ?? null) === "pass"} styles={styles} colors={colors} />
+        <Text style={styles.cardTitle}>This Device</Text>
+        <Text style={styles.value}>{DeviceInfo.getModel()}</Text>
+        {budget ? (
+          <>
+            <Text style={styles.value}>
+              {budget.totalMb >= 1024 ? `${(budget.totalMb / 1024).toFixed(1)} GB` : `${budget.totalMb.toFixed(0)} MB`} RAM
+            </Text>
+            <View style={styles.suggestionBox}>
+              <Text style={styles.suggestionLabel}>Suggested model size</Text>
+              <Text style={styles.suggestionValue}>
+                up to ~{budget.maxParamsBillion.toFixed(1)}B parameters (Q4)
+              </Text>
+              <Text style={styles.suggestionNote}>
+                Larger models may still run but can bottleneck or crash from out-of-memory -- Model Manager flags this per file.
+              </Text>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.value}>Could not read device memory.</Text>
+        )}
+      </Card>
+
+      <Card>
+        <Text style={styles.cardTitle}>Library</Text>
+        <Text style={styles.value}>{modelCount} model{modelCount === 1 ? "" : "s"} downloaded -- {formatBytes(storageUsed)}</Text>
+        <Text style={styles.value}>{projectCount} project{projectCount === 1 ? "" : "s"}</Text>
       </Card>
 
       <Card>
         <Text style={styles.cardTitle}>Quick Actions</Text>
         <View style={styles.actionsRow}>
-          <QuickAction label="Deploy" onPress={() => navigation.navigate("Deployment Wizard")} styles={styles} />
-          <QuickAction label="Diagnostics" onPress={() => navigation.navigate("Diagnostics")} styles={styles} />
+          <QuickAction label="Models" onPress={() => navigation.navigate("Models")} styles={styles} />
+          <QuickAction label="Projects" onPress={() => navigation.navigate("Projects")} styles={styles} />
           <QuickAction label="Inference" onPress={() => navigation.navigate("Inference")} styles={styles} />
         </View>
       </Card>
-    </ScrollView>
-  );
-}
-
-function ChecklistLine({
-  label,
-  ok,
-  styles,
-  colors,
-}: {
-  label: string;
-  ok: boolean;
-  styles: ReturnType<typeof createStyles>;
-  colors: ColorPalette;
-}) {
-  return (
-    <View style={styles.checklistLine}>
-      <Text style={[styles.checkMark, { color: ok ? colors.running : colors.textSecondary }]}>{ok ? "✔" : "○"}</Text>
-      <Text style={styles.checklistLabel}>{label}</Text>
     </View>
   );
 }
@@ -114,53 +99,29 @@ function QuickAction({
 
 function createStyles(colors: ColorPalette) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    content: { padding: spacing.md },
-    title: {
-      color: colors.textPrimary,
-      fontSize: 24,
-      fontWeight: "700",
-      marginBottom: spacing.md,
+    container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+    title: { color: colors.textPrimary, fontSize: 24, fontWeight: "700", marginBottom: spacing.md },
+    cardTitle: { color: colors.textPrimary, fontSize: 16, fontWeight: "600", marginBottom: spacing.sm },
+    value: { color: colors.textSecondary, fontSize: 13, marginBottom: 2 },
+    suggestionBox: {
+      borderWidth: 1,
+      borderColor: colors.cpu,
+      backgroundColor: colors.surfaceAlt,
+      padding: spacing.sm,
+      marginTop: spacing.sm,
     },
-    cardTitle: {
-      color: colors.textPrimary,
-      fontSize: 16,
-      fontWeight: "600",
-      marginBottom: spacing.sm,
-    },
-    rowBetween: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: spacing.sm,
-    },
-    checklistLine: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 4,
-    },
-    checkMark: {
-      width: 20,
-      fontFamily: "monospace",
-    },
-    checklistLabel: {
-      color: colors.textSecondary,
-      fontSize: 13,
-    },
-    actionsRow: {
-      flexDirection: "row",
-      gap: spacing.sm,
-    },
+    suggestionLabel: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
+    suggestionValue: { color: colors.cpu, fontSize: 16, fontWeight: "700", marginTop: 2 },
+    suggestionNote: { color: colors.textSecondary, fontSize: 11, marginTop: spacing.xs },
+    actionsRow: { flexDirection: "row", gap: spacing.sm },
     quickAction: {
+      flex: 1,
       borderWidth: 1,
       borderColor: colors.border,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
+      alignItems: "center",
     },
-    quickActionText: {
-      color: colors.cpu,
-      fontWeight: "600",
-      fontSize: 13,
-    },
+    quickActionText: { color: colors.cpu, fontWeight: "600", fontSize: 13 },
   });
 }

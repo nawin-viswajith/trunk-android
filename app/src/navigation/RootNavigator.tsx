@@ -10,8 +10,6 @@ import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
 import { ModelsScreen } from "../screens/ModelsScreen";
 import { HuggingFaceSearchScreen } from "../screens/HuggingFaceSearchScreen";
 import { HuggingFaceFilesScreen } from "../screens/HuggingFaceFilesScreen";
-import { DeploymentWizardScreen } from "../screens/DeploymentWizardScreen";
-import { DiagnosticsScreen } from "../screens/DiagnosticsScreen";
 import { InferenceScreen } from "../screens/InferenceScreen";
 
 const Tab = createBottomTabNavigator();
@@ -51,8 +49,6 @@ const ICONS: Record<string, string> = {
   Home: "⌂",
   Projects: "▤",
   Models: "◧",
-  "Deployment Wizard": "⚙",
-  Diagnostics: "✚",
   Inference: "▷",
 };
 
@@ -73,8 +69,6 @@ export function RootNavigator() {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Projects" component={ProjectsStackNavigator} options={{ headerShown: false }} />
       <Tab.Screen name="Models" component={ModelsStackNavigator} options={{ headerShown: false }} />
-      <Tab.Screen name="Deployment Wizard" component={DeploymentWizardScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Inference" component={InferenceScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
