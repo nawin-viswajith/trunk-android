@@ -48,7 +48,7 @@ export function AboutSettingsScreen() {
           </Pressable>
           <View style={styles.heroTextWrap}>
             <Text style={styles.tagline}>Local inference engine for LLMs on your phone.</Text>
-            <Text style={styles.identity}>TuskerLabs · MIT License</Text>
+            <Text style={styles.identity}>© 2026 TuskerLabs · MIT License</Text>
           </View>
         </View>
         <Text style={styles.shortDescription}>
@@ -81,7 +81,9 @@ export function AboutSettingsScreen() {
   );
 }
 
-const MIT_LICENSE_TEXT = `Permission is hereby granted, free of charge, to any person obtaining a copy
+const MIT_LICENSE_TEXT = `Copyright (c) 2026 TuskerLabs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
