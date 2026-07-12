@@ -1,14 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
 import { Button } from "../components/Button";
 import { StatusBadge } from "../components/StatusBadge";
-import { spacing, ColorPalette } from "../theme/colors";
+import { ColorPalette, spacing } from "../theme/colors";
+import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
-import { huggingfaceApi } from "../api/huggingface";
-import { connectJsonWs } from "../api/ws";
-import { useSettingsStore } from "../state/useSettingsStore";
-import { HfDownloadFrame, HfGgufFile } from "../api/types";
+import { huggingfaceApi, HfFileSummary } from "../api/huggingface";
+import { checkCompatibility, CompatibilityInfo } from "../utils/compatibility";
+import { downloadModel, isModelDownloaded } from "../services/modelStorage";
+import { canProceedWithDownload } from "../services/downloadPolicy";
 import { formatBytes } from "../utils/format";
+import { showAlert } from "../state/useAlertStore";
+import { reportDownloadProgress, stopTrackingDownload, useDownloadStore } from "../state/useDownloadStore";
 
 const CATEGORY_LABEL: Record<string, string> = {
   supported: "SUPPORTED",
@@ -17,105 +21,150 @@ const CATEGORY_LABEL: Record<string, string> = {
   unknown: "UNKNOWN",
 };
 
-interface ActiveDownload {
-  filename: string;
-  jobId: string;
-  downloadedBytes: number;
-  totalBytes: number;
+interface FileRow extends HfFileSummary {
+  compatibility: CompatibilityInfo;
+  downloaded: boolean;
+}
+
+/** Walks up to the root Tab.Navigator to check whether "Models" is the
+ * currently active tab — re-checked fresh at completion time (not render
+ * time), since the download can easily finish minutes after the user
+ * wandered off to another tab. */
+function isModelsTabActive(navigation: any): boolean {
+  let nav = navigation;
+  while (nav) {
+    const state = nav.getState?.();
+    if (state?.type === "tab") {
+      return state.routeNames[state.index] === "Models";
+    }
+    nav = nav.getParent?.();
+  }
+  return false;
 }
 
 export function HuggingFaceFilesScreen({ route, navigation }: any) {
+  const repoId: string = route.params.repoId;
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const repoId: string = route.params.repoId;
-  const serial = useSettingsStore((s) => s.activeDeviceSerial);
-  const [files, setFiles] = useState<HfGgufFile[]>([]);
+  const [files, setFiles] = useState<FileRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [download, setDownload] = useState<ActiveDownload | null>(null);
+  const downloads = useDownloadStore((s) => s.downloads);
+  const activeDownload = Object.values(downloads).find((d) => d.status === "downloading");
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setFiles(await huggingfaceApi.listFiles(repoId, serial));
+      const rawFiles = await huggingfaceApi.listFiles(repoId);
+      const rows = await Promise.all(
+        rawFiles.map(async (f) => ({
+          ...f,
+          compatibility: await checkCompatibility(f.size_bytes),
+          downloaded: await isModelDownloaded(f.filename),
+        }))
+      );
+      setFiles(rows);
     } catch (err) {
-      Alert.alert("Could not load files", String(err));
+      showAlert("Could not load files", String(err));
     } finally {
       setLoading(false);
     }
-  }, [repoId, serial]);
+  }, [repoId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const startDownload = async (file: HfGgufFile) => {
-    try {
-      const { job_id } = await huggingfaceApi.download(repoId, file.filename, serial);
-      setDownload({ filename: file.filename, jobId: job_id, downloadedBytes: 0, totalBytes: file.size_bytes });
+  const startDownload = async (file: FileRow) => {
+    if (!(await canProceedWithDownload(file.filename))) return;
 
-      const disconnect = connectJsonWs<HfDownloadFrame>(`/ws/huggingface/${job_id}`, (frame) => {
-        if (frame.type === "progress") {
-          setDownload((prev) => (prev ? { ...prev, downloadedBytes: frame.downloaded_bytes, totalBytes: frame.total_bytes } : prev));
-        } else if (frame.type === "done") {
-          setDownload(null);
-          disconnect();
-          Alert.alert("Download complete", `${file.filename} is now available in Models.`, [
-            { text: "Go to Models", onPress: () => navigation.navigate("Models List") },
-            { text: "Stay here" },
-          ]);
-        } else if (frame.type === "cancelled") {
-          setDownload(null);
-          disconnect();
-        } else if (frame.type === "error") {
-          setDownload(null);
-          disconnect();
-          Alert.alert("Download failed", frame.message);
-        }
+    const handle = downloadModel(huggingfaceApi.downloadUrl(repoId, file.filename), file.filename, (fraction) => {
+      reportDownloadProgress(file.filename, fraction);
+    });
+    useDownloadStore.getState().beginDownload(file.filename, handle.cancel);
+
+    handle.done
+      .then(async () => {
+        stopTrackingDownload(file.filename);
+        useDownloadStore.getState().clearDownload(file.filename);
+        await load();
+        showAlert(
+          "Download complete",
+          `${file.filename} is now available in Models.`,
+          isModelsTabActive(navigation)
+            ? [{ label: "OK" }]
+            : [
+                { label: "Go to Models", onPress: () => navigation.navigate("Models List") },
+                { label: "Stay here", variant: "neutral" },
+              ]
+        );
+      })
+      .catch((err) => {
+        stopTrackingDownload(file.filename);
+        useDownloadStore.getState().setFailed(file.filename, String(err));
+        showAlert("Download failed", String(err));
       });
-    } catch (err) {
-      Alert.alert("Could not start download", String(err));
-    }
   };
 
-  const confirmDownload = (file: HfGgufFile) => {
-    if (download) {
-      Alert.alert("Download in progress", "Wait for the current download to finish first.");
+  const confirmDownload = (file: FileRow) => {
+    if (activeDownload) {
+      showAlert("Download in progress", "Wait for the current download to finish first.");
       return;
     }
     const category = file.compatibility.category;
-    const title = category === "not_supported" ? "This will likely crash from OOM" : "Download this model?";
-    const buttonLabel = category === "not_supported" ? "Download Anyway" : "Download";
-    Alert.alert(title, `${file.filename}\n\n${file.compatibility.message}`, [
-      { text: "Cancel", style: "cancel" },
-      { text: buttonLabel, style: category === "not_supported" ? "destructive" : "default", onPress: () => startDownload(file) },
+
+    if (category === "not_supported") {
+      // Two-step confirmation for the risky tier: an initial warning, then a
+      // second, harder confirmation spelling out concrete consequences -
+      // proceeding past this point is an explicit, informed choice.
+      showAlert("This will likely crash from OOM", `${file.filename}\n\n${file.compatibility.message}`, [
+        { label: "Cancel", variant: "neutral" },
+        { label: "Continue Anyway", variant: "danger", onPress: () => confirmRiskyDownloadFinal(file) },
+      ]);
+      return;
+    }
+
+    const title = category === "can_bottleneck" ? "This may bottleneck your device" : "Download this model?";
+    showAlert(title, `${file.filename}\n\n${file.compatibility.message}`, [
+      { label: "Cancel", variant: "neutral" },
+      { label: "Download", onPress: () => startDownload(file) },
     ]);
   };
 
+  const confirmRiskyDownloadFinal = (file: FileRow) => {
+    showAlert(
+      "Last chance - this is risky",
+      "Running this model can cause:\n\n" +
+        "- The app crashing or being killed by Android (out-of-memory)\n" +
+        "- The whole phone slowing down or freezing temporarily\n" +
+        "- Other open apps being force-closed to free memory\n" +
+        "- In rare cases, needing to restart the phone\n\n" +
+        "Your data won't be damaged, but the experience may be unusable. Proceed entirely at your own risk.",
+      [
+        { label: "Cancel", variant: "neutral" },
+        { label: "I Understand, Download", variant: "danger", onPress: () => startDownload(file) },
+      ]
+    );
+  };
+
   const cancelDownload = async () => {
-    if (!download) return;
-    await huggingfaceApi.cancel(download.jobId);
+    if (!activeDownload) return;
+    stopTrackingDownload(activeDownload.filename);
+    await activeDownload.cancel();
+    useDownloadStore.getState().clearDownload(activeDownload.filename);
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{repoId}</Text>
-      {!serial ? <Text style={styles.warning}>No device connected -- compatibility can't be checked yet.</Text> : null}
 
-      {download ? (
+      {activeDownload ? (
         <View style={styles.progressCard}>
-          <Text style={styles.progressLabel}>Downloading {download.filename}</Text>
+          <Text style={styles.progressLabel}>Downloading {activeDownload.filename}</Text>
           <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${download.totalBytes ? Math.min(100, (download.downloadedBytes / download.totalBytes) * 100) : 0}%` },
-              ]}
-            />
+            <View style={[styles.progressFill, { width: `${Math.min(100, activeDownload.progress * 100)}%` }]} />
           </View>
           <View style={styles.progressRow}>
-            <Text style={styles.progressText}>
-              {formatBytes(download.downloadedBytes)} / {formatBytes(download.totalBytes)}
-            </Text>
+            <Text style={styles.progressText}>{(activeDownload.progress * 100).toFixed(0)}%</Text>
             <Button label="Cancel" variant="danger" onPress={cancelDownload} />
           </View>
         </View>
@@ -131,11 +180,15 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
           <View style={styles.card}>
             <View style={styles.headerRow}>
               <Text style={styles.filename}>{item.filename}</Text>
-              <StatusBadge status={item.compatibility.category} label={CATEGORY_LABEL[item.compatibility.category]} />
+              {item.downloaded ? (
+                <StatusBadge status="pass" label="DOWNLOADED" />
+              ) : (
+                <StatusBadge status={item.compatibility.category} label={CATEGORY_LABEL[item.compatibility.category]} />
+              )}
             </View>
             <Text style={styles.meta}>{[item.quant, formatBytes(item.size_bytes)].filter(Boolean).join(" · ")}</Text>
-            <Text style={styles.compatMessage}>{item.compatibility.message}</Text>
-            <Button label="Download" onPress={() => confirmDownload(item)} variant="secondary" />
+            {!item.downloaded ? <Text style={styles.compatMessage}>{item.compatibility.message}</Text> : null}
+            {!item.downloaded ? <Button label="Download" onPress={() => confirmDownload(item)} variant="secondary" /> : null}
           </View>
         )}
         ListEmptyComponent={!loading ? <Text style={styles.empty}>No single-file GGUF variants found in this repo.</Text> : null}
@@ -145,10 +198,10 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
 }
 
 function createStyles(colors: ColorPalette) {
+  const screen = createScreenStyles(colors);
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, padding: spacing.md },
+    container: { ...screen.container, padding: spacing.md },
     title: { color: colors.textPrimary, fontSize: 16, fontWeight: "700", marginBottom: spacing.sm },
-    warning: { color: colors.warning, fontSize: 12, marginBottom: spacing.sm },
     list: { paddingBottom: spacing.lg },
     card: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.sm },
     headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.xs },
@@ -156,10 +209,10 @@ function createStyles(colors: ColorPalette) {
     meta: { color: colors.textSecondary, fontSize: 12, fontFamily: "monospace", marginBottom: spacing.xs },
     compatMessage: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
     empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
-    progressCard: { borderWidth: 1, borderColor: colors.cpu, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.md },
+    progressCard: { borderWidth: 1, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.md },
     progressLabel: { color: colors.textPrimary, fontSize: 12, fontFamily: "monospace", marginBottom: spacing.xs },
     progressTrack: { height: 6, backgroundColor: colors.surfaceAlt, marginBottom: spacing.xs },
-    progressFill: { height: 6, backgroundColor: colors.cpu },
+    progressFill: { height: 6, backgroundColor: colors.accent },
     progressRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     progressText: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
   });

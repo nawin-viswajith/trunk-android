@@ -1,36 +1,44 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { Text } from "react-native";
+import { Text } from "../components/Text";
 import { ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
+import { fontFamilyForWeight } from "../theme/fonts";
+import { useSettingsStore } from "../state/useSettingsStore";
 import { HomeScreen } from "../screens/HomeScreen";
 import { ProjectsScreen } from "../screens/ProjectsScreen";
 import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
 import { ModelsScreen } from "../screens/ModelsScreen";
 import { HuggingFaceSearchScreen } from "../screens/HuggingFaceSearchScreen";
 import { HuggingFaceFilesScreen } from "../screens/HuggingFaceFilesScreen";
-import { DeploymentWizardScreen } from "../screens/DeploymentWizardScreen";
-import { DiagnosticsScreen } from "../screens/DiagnosticsScreen";
 import { InferenceScreen } from "../screens/InferenceScreen";
+import { FlowListScreen } from "../screens/playground/FlowListScreen";
+import { AgentLibraryScreen } from "../screens/playground/AgentLibraryScreen";
+import { FlowEditorScreen } from "../screens/playground/FlowEditorScreen";
+import { RunFlowScreen } from "../screens/playground/RunFlowScreen";
+import { withSwipe } from "./SwipeableScreen";
 
 const Tab = createBottomTabNavigator();
 const ProjectsStack = createNativeStackNavigator();
 const ModelsStack = createNativeStackNavigator();
+const PlaygroundStack = createNativeStackNavigator();
 
-function getStackScreenOptions(colors: ColorPalette) {
+function getStackScreenOptions(colors: ColorPalette, useCustomFont: boolean) {
   return {
     headerStyle: { backgroundColor: colors.surface },
     headerTintColor: colors.textPrimary,
+    headerTitleStyle: { fontFamily: fontFamilyForWeight("600", useCustomFont) },
     headerShadowVisible: false,
   };
 }
 
 function ProjectsStackNavigator() {
   const colors = useColors();
+  const useCustomFont = useSettingsStore((s) => s.useCustomFont);
   return (
-    <ProjectsStack.Navigator screenOptions={getStackScreenOptions(colors)}>
-      <ProjectsStack.Screen name="Projects List" component={ProjectsScreen} />
+    <ProjectsStack.Navigator screenOptions={getStackScreenOptions(colors, useCustomFont)}>
+      <ProjectsStack.Screen name="Projects List" component={ProjectsScreen} options={{ headerShown: false }} />
       <ProjectsStack.Screen name="Project Detail" component={ProjectDetailScreen} />
     </ProjectsStack.Navigator>
   );
@@ -38,12 +46,26 @@ function ProjectsStackNavigator() {
 
 function ModelsStackNavigator() {
   const colors = useColors();
+  const useCustomFont = useSettingsStore((s) => s.useCustomFont);
   return (
-    <ModelsStack.Navigator screenOptions={getStackScreenOptions(colors)}>
-      <ModelsStack.Screen name="Models List" component={ModelsScreen} />
+    <ModelsStack.Navigator screenOptions={getStackScreenOptions(colors, useCustomFont)}>
+      <ModelsStack.Screen name="Models List" component={ModelsScreen} options={{ headerShown: false }} />
       <ModelsStack.Screen name="Browse Hugging Face" component={HuggingFaceSearchScreen} />
       <ModelsStack.Screen name="Hugging Face Files" component={HuggingFaceFilesScreen} />
     </ModelsStack.Navigator>
+  );
+}
+
+function PlaygroundStackNavigator() {
+  const colors = useColors();
+  const useCustomFont = useSettingsStore((s) => s.useCustomFont);
+  return (
+    <PlaygroundStack.Navigator screenOptions={getStackScreenOptions(colors, useCustomFont)}>
+      <PlaygroundStack.Screen name="Flow List" component={FlowListScreen} options={{ headerShown: false }} />
+      <PlaygroundStack.Screen name="Agent Library" component={AgentLibraryScreen} />
+      <PlaygroundStack.Screen name="Flow Editor" component={FlowEditorScreen} options={{ headerShown: false }} />
+      <PlaygroundStack.Screen name="Run Flow" component={RunFlowScreen} options={{ headerShown: false }} />
+    </PlaygroundStack.Navigator>
   );
 }
 
@@ -51,31 +73,33 @@ const ICONS: Record<string, string> = {
   Home: "⌂",
   Projects: "▤",
   Models: "◧",
-  "Deployment Wizard": "⚙",
-  Diagnostics: "✚",
   Inference: "▷",
+  Playground: "◈",
 };
 
 export function RootNavigator() {
   const colors = useColors();
+  const useCustomFont = useSettingsStore((s) => s.useCustomFont);
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.surface },
         headerTintColor: colors.textPrimary,
+        headerTitleStyle: { fontFamily: fontFamilyForWeight("600", useCustomFont) },
         headerShadowVisible: false,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarActiveTintColor: colors.cpu,
+        tabBarLabelStyle: { fontFamily: fontFamilyForWeight(undefined, useCustomFont) },
+        tabBarHideOnKeyboard: true,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarIcon: () => <Text style={{ fontSize: 16, color: colors.textSecondary }}>{ICONS[route.name] ?? "•"}</Text>,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Projects" component={ProjectsStackNavigator} options={{ headerShown: false }} />
-      <Tab.Screen name="Models" component={ModelsStackNavigator} options={{ headerShown: false }} />
-      <Tab.Screen name="Deployment Wizard" component={DeploymentWizardScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Inference" component={InferenceScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Home" component={withSwipe(HomeScreen)} options={{ headerShown: false }} />
+      <Tab.Screen name="Models" component={withSwipe(ModelsStackNavigator)} options={{ headerShown: false }} />
+      <Tab.Screen name="Projects" component={withSwipe(ProjectsStackNavigator)} options={{ headerShown: false }} />
+      <Tab.Screen name="Playground" component={withSwipe(PlaygroundStackNavigator)} options={{ headerShown: false }} />
+      <Tab.Screen name="Inference" component={withSwipe(InferenceScreen)} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
 }

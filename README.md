@@ -1,37 +1,53 @@
-# PocketCoder
+# Trunk
 
-A GUI development environment for deploying and running local LLMs on Android
-via ADB, Termux, and llama.cpp -- built on top of the manual workflow
-documented in [`../github`](../github). Phase 1 (v1.0 Core): Project Manager,
-Model Manager, Deployment Wizard, Diagnostics ("Doctor"), Inference, and Live
-Logs. See [`plan/IMPLEMENTATION_PLAN.md`](plan/IMPLEMENTATION_PLAN.md) for the
-full design and [`plan/thingsToNote.md`](plan/thingsToNote.md) for known
-caveats.
+**by TuskerLabs**
+
+Local inference engine for LLMs on your phone.
+
+An Android app that runs LLMs entirely on-device - search Hugging Face,
+download a GGUF model straight to your phone, and chat with it completely
+offline. No cloud, no server, and no account required to use the app; nothing
+you type is synced anywhere.
+
+Open source, MIT licensed - see [`LICENSE`](LICENSE). Contributions and
+issues welcome.
 
 ## Architecture
 
 ```
-app/       Expo (React Native) frontend -- bottom-tab nav + drawer (Logs/Settings)
-backend/   FastAPI backend -- owns the adb connection, shells out to
-           adb/Termux/llama.cpp, exposes REST + WebSocket APIs
+app/       Expo (React Native) app - the whole product. Downloads GGUF
+           models directly from Hugging Face and runs them in-process via
+           llama.rn (llama.cpp compiled natively into the app). No backend
+           involved in running or downloading models.
+backend/   Thin, stateless FastAPI service used only for Hugging Face
+           search/browse (GET /api/huggingface/search, GET .../files).
+           Has no database and no device affinity - deployable anywhere.
+docs/branding/   Source artwork and a high-resolution flattened master of
+           the app icon, for store listings and press use (separate from
+           the platform-specific icon files actually bundled in app/assets).
 ```
-
-The backend runs on your dev machine and owns the USB/adb connection to the
-phone. The Expo app only ever talks to the backend, never directly to the
-phone.
 
 ## Prerequisites
 
-- Python 3.12+
-- Node.js 20+
-- Android Platform Tools (`adb`) -- update the path in `backend/.env` if it
-  isn't at the default location
-- An Android phone with USB debugging enabled, Termux (from
-  [F-Droid/GitHub releases](https://github.com/termux/termux-app/releases),
-  not the outdated Play Store build) and Termux:API installed, with
-  `allow-external-apps = true` set in `~/.termux/termux.properties` (required
-  so the backend can run setup/build commands inside Termux -- Diagnostics
-  will flag this if missing)
+- Node.js 20+, Python 3.12+ (backend only)
+- Android Studio + SDK (the app needs a custom native build, not Expo Go,
+  since `llama.rn` is a native module)
+- A physical Android device or emulator, arm64 recommended
+
+## App setup
+
+```bash
+cd app
+npm install
+npx expo prebuild --platform android   # generates the native android/ project
+npx expo run:android                    # builds and installs on a connected device/emulator
+```
+
+Point **Settings → Hugging Face Search** at wherever the backend is running
+(defaults to `http://localhost:8000`; use your machine's LAN IP if the app
+runs on a separate physical device, or the deployed Render URL once hosted).
+When developing against a USB-connected device, remember to forward both the
+Metro and backend ports: `adb reverse tcp:8081 tcp:8081 && adb reverse tcp:8000 tcp:8000`.
 
 ## Backend setup
 
@@ -40,48 +56,75 @@ cd backend
 python -m venv .venv
 ./.venv/Scripts/activate        # .venv/bin/activate on macOS/Linux
 pip install -r requirements-dev.txt
-cp .env.example .env            # adjust ADB_PATH etc. if needed
+cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
 - API docs: http://localhost:8000/docs
 - Run tests: `pytest`
-- Drop `.gguf` model files into `backend/workspace/models/` for the Model
-  Manager to pick them up
-
-## App setup
-
-```bash
-cd app
-npm install
-npx expo start
-```
-
-Open the app in Expo Go (or a dev client) on your phone/emulator, then set the
-backend URL in **Settings** to point at the machine running the FastAPI
-backend (e.g. `http://192.168.1.50:8000` if the app runs on a separate
-device from the backend, or `http://localhost:8000` if running in an
-Android emulator on the same machine via `adb reverse`).
+- Deploy: build via the included `Dockerfile` (e.g. on Render - stateless,
+  no persistent volume needed)
 
 ## Typical flow
 
-1. **Settings** -- confirm the backend URL and select your connected device.
-2. **Diagnostics** -- run a full check; fix anything it flags before continuing.
-3. **Deployment Wizard** -- install Termux, install dependencies, deploy and
-   build llama.cpp on-device (CPU backend only in Phase 1).
-4. **Models** -- push a local `.gguf` file to the device.
-5. **Projects** -- create a project and assign it a model.
-6. **Inference** -- chat with the model; token stream and history are saved
-   per-project.
-7. **Logs** -- live, filterable (CPU/NPU/DSP/FastRPC/OpenCL/System) tail of
-   everything the backend has run.
+1. **First launch** - a short intro, an explicit warning that chat data is
+   device-only and unrecoverable if the app is removed, then a mandatory
+   one-time setup step (theme, dark contrast, color palette, and whether to
+   show per-response stats) before the app is usable.
+2. **Home** - this device's RAM/storage, a suggested max model size, and
+   library/analytics summaries.
+3. **Models → Browse Hugging Face** - search (or browse a live "Popular"
+   list), see per-file size/quant and a compatibility badge (supported / can
+   bottleneck / not supported) computed from your phone's own memory.
+   Downloading a model flagged "not supported" requires an explicit two-step
+   confirmation. Also supports **Import from Device** for a `.gguf` you
+   already have.
+4. **Projects** - create a project, assign a downloaded model, tune
+   inference parameters (temperature, top-p, top-k, context length, max
+   tokens), and review per-session token/speed history. Hold a project or
+   model tile to multi-select and bulk-delete.
+5. **Playground** - build reusable **Agents** (a name + system prompt,
+   hand-written or drafted by the loaded model from a plain-language
+   description) and wire several into a linear **Flow**, chaining each
+   agent's output into the next agent's input. Running a flow streams each
+   step live and shows step-by-step + final output.
+6. **Inference** - chat with a project's model, or run a saved Flow instead;
+   runs fully on-device via `llama.rn`. Multiple chat sessions per project,
+   prior turns are replayed as context, markdown (code blocks, inline code,
+   bold/italic) renders in responses.
 
-## Known limitations (Phase 1)
+Swipe left/right on any of the five main tabs (Home, Models, Projects,
+Playground, Inference) to move between them, in addition to tapping the tab
+bar.
 
-- NPU/Hexagon backend is intentionally not offered as a working path --
-  Diagnostics explains the current upstream blocker
-  (`libggml-htp-v81.so` not found via FastRPC) instead of pretending to fix it.
-- No in-app Hugging Face download/convert/quantize pipeline yet -- bring your
-  own `.gguf` files.
-- No benchmarking, embedded terminal, file explorer, or plugin system yet --
-  planned for later phases.
+## Settings
+
+- **Downloads** - Ask / Wi-Fi only / Allow mobile data, with a "remember my
+  choice" checkbox on the in-context prompt that writes back to this setting.
+- **Lite Mode** - caps the CPU threads used for generation to save
+  battery/heat, at the cost of speed; shows a one-time warning when enabled.
+- **Background running** - a one-tap shortcut to Android's "ignore battery
+  optimizations" dialog, so long downloads/inference are less likely to be
+  paused while the app is backgrounded.
+
+## Design system
+
+Flat, sharp-edged UI (no gradients, no border-radius except a few deliberate
+circles - FABs, palette swatches). Six built-in accent palettes plus a
+Greyscale option and a custom hex picker, each independently tuned for light
+and dark mode. Dark mode has two contrast levels: a standard dark grey and a
+true OLED pitch-black. All of this is configurable from **Settings**, and
+onboarding reuses the exact same picker so first-run setup and Settings never
+drift apart.
+
+## Known limitations
+
+- GGUF only (the format `llama.cpp`/`llama.rn` understand).
+- No multimodal (image/audio) support yet - `llama.rn` supports it via a
+  separate "mmproj" projector file paired with the main model, but the
+  download/import flow and chat UI don't handle that pairing yet.
+- No Hugging Face account/curation features on the backend yet - it's
+  intentionally minimal for now.
+- Downloaded models aren't linked back to their source Hugging Face repo,
+  so there's no in-app README/description view for a model once saved -
+  only filename, quant, size, and date added.

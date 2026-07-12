@@ -1,22 +1,31 @@
-import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text } from "react-native";
+﻿import React from "react";
+import { ActivityIndicator, Pressable, StyleSheet, TextStyle } from "react-native";
+import { Text } from "./Text";
 import { spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
 interface ButtonProps {
   label: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "danger";
+  variant?: "primary" | "secondary" | "danger" | "neutral";
   disabled?: boolean;
   loading?: boolean;
+  /** Override for icon-glyph labels (e.g. the send arrow) that need a
+   * larger size than normal text labels. */
+  labelStyle?: TextStyle;
 }
 
-export function Button({ label, onPress, variant = "primary", disabled, loading }: ButtonProps) {
+// One template for every variant: unfilled, border and text the same color,
+// centered label. Variants differ only in which color they use — no
+// per-variant fill/solid special cases, so buttons read as one consistent
+// class throughout the app rather than each screen inventing its own look.
+export function Button({ label, onPress, variant = "primary", disabled, loading, labelStyle }: ButtonProps) {
   const colors = useColors();
   const VARIANT_COLOR: Record<string, string> = {
-    primary: colors.cpu,
-    secondary: colors.border,
+    primary: colors.accent,
+    secondary: colors.accentSecondary,
     danger: colors.error,
+    neutral: colors.textSecondary,
   };
   const color = VARIANT_COLOR[variant];
   return (
@@ -25,15 +34,15 @@ export function Button({ label, onPress, variant = "primary", disabled, loading 
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
-        { borderColor: color, backgroundColor: variant === "secondary" ? "transparent" : color + "22" },
+        { borderColor: color },
         (disabled || loading) && styles.disabled,
-        pressed && styles.pressed,
+        pressed && { backgroundColor: color + "22" },
       ]}
     >
       {loading ? (
         <ActivityIndicator size="small" color={color} />
       ) : (
-        <Text style={[styles.label, { color }]}>{label}</Text>
+        <Text style={[styles.label, { color }, labelStyle]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -46,7 +55,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     alignItems: "center",
     justifyContent: "center",
-    // no borderRadius -- sharp edges
+    // no borderRadius - sharp edges
   },
   label: {
     fontWeight: "600",

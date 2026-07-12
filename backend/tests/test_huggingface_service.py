@@ -1,11 +1,7 @@
-import asyncio
-
 import httpx
 import pytest
 
-from app.config import settings
 from app.services import huggingface_service
-from app.services.compatibility_service import DeviceMemory
 
 
 class _FakeResponse:
@@ -55,43 +51,11 @@ async def test_list_gguf_files_filters_split_shards_and_non_gguf(monkeypatch):
     ]
     monkeypatch.setattr(httpx, "AsyncClient", lambda timeout=10.0: _FakeClient(tree))
 
-    async def fake_get_device_memory(serial):
-        return DeviceMemory(total_mb=16000, available_mb=12000)
-
-    monkeypatch.setattr(
-        huggingface_service.compatibility_service, "get_device_memory", fake_get_device_memory
-    )
-
-    files = await huggingface_service.list_gguf_files("some/repo", serial=None)
+    files = await huggingface_service.list_gguf_files("some/repo")
 
     assert [f.filename for f in files] == ["model-q4_0.gguf"]
     assert files[0].quant == "Q4_0"
-    assert files[0].compatibility.category == "supported"
-
-
-def test_safe_download_path_rejects_traversal():
-    with pytest.raises(ValueError):
-        huggingface_service.safe_download_path("../../etc/passwd")
-
-
-def test_safe_download_path_accepts_plain_filename(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "models_dir", tmp_path)
-    path = huggingface_service.safe_download_path("model.gguf")
-    assert path.parent == tmp_path.resolve()
-
-
-@pytest.mark.asyncio
-async def test_cancel_download_sets_event():
-    event = asyncio.Event()
-    huggingface_service._cancel_events["job-1"] = event
-    huggingface_service.cancel_download("job-1")
-    assert event.is_set()
-    huggingface_service._cancel_events.pop("job-1", None)
-
-
-@pytest.mark.asyncio
-async def test_cancel_download_unknown_job_is_a_noop():
-    huggingface_service.cancel_download("does-not-exist")  # must not raise
+    assert files[0].size_bytes == 4_000_000_000
 
 
 @pytest.mark.asyncio
@@ -106,3 +70,16 @@ async def test_search_models_against_real_hf_api():
 
     assert len(results) > 0
     assert all(r.repo_id and r.downloads >= 0 for r in results)
+
+
+@pytest.mark.asyncio
+async def test_list_gguf_files_against_real_hf_api():
+    try:
+        files = await huggingface_service.list_gguf_files("Qwen/Qwen2.5-Coder-7B-Instruct-GGUF")
+    except httpx.HTTPError:
+        pytest.skip("no network access to huggingface.co in this environment")
+        return
+
+    assert len(files) > 0
+    assert all(f.filename.endswith(".gguf") for f in files)
+    assert not any(f.filename for f in files if "-of-" in f.filename)

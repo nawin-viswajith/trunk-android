@@ -1,0 +1,224 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../../components/Text";
+import { TextInput } from "../../components/TextInput";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Button } from "../../components/Button";
+import { MarkdownText } from "../../components/MarkdownText";
+import { TypingDots } from "../../components/TypingDots";
+import { runFlow, FlowProgress, FlowStepResult } from "../../services/flowRunner";
+import { selectFlow, useFlowStore } from "../../state/useFlowStore";
+import { ColorPalette, spacing } from "../../theme/colors";
+import { createScreenStyles } from "../../theme/layout";
+import { useColors } from "../../theme/ThemeContext";
+
+export function RunFlowScreen({ route, navigation }: any) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { flowId } = route.params;
+
+  const flow = useFlowStore((s) => selectFlow(s.flows, flowId));
+  const agents = useFlowStore((s) => s.agents);
+
+  const [input, setInput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [steps, setSteps] = useState<FlowStepResult[]>([]);
+  const [activeStep, setActiveStep] = useState<FlowProgress | null>(null);
+  const [finalResult, setFinalResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const listRef = useRef<FlatList<FlowStepResult>>(null);
+
+  useEffect(() => {
+    // Same approach as InferenceScreen: tab bar hides on keyboard
+    // (tabBarHideOnKeyboard), so padding by the raw keyboard height is
+    // correct without double-counting.
+    const showEvent = Platform.OS === "android" ? "keyboardDidShow" : "keyboardWillShow";
+    const hideEvent = Platform.OS === "android" ? "keyboardDidHide" : "keyboardWillHide";
+    const showSub = Keyboard.addListener(showEvent, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  if (!flow) return null;
+
+  const run = async () => {
+    if (!input.trim() || running) return;
+    setRunning(true);
+    setSteps([]);
+    setActiveStep(null);
+    setFinalResult(null);
+    setError(null);
+    try {
+      const result = await runFlow(
+        flow,
+        agents,
+        input.trim(),
+        (step) => {
+          setSteps((cur) => [...cur, step]);
+          setActiveStep(null);
+          requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+        },
+        (progress) => {
+          setActiveStep(progress);
+          requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+        }
+      );
+      setFinalResult(result);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setRunning(false);
+      setActiveStep(null);
+    }
+  };
+
+  return (
+    <View style={[styles.container, { paddingBottom: keyboardHeight ? keyboardHeight + spacing.md : 0 }]}>
+      <View style={[styles.topBar, { paddingTop: Math.max(spacing.sm, insets.top) }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backButton}>
+          <Text style={styles.backButtonLabel}>‹</Text>
+        </Pressable>
+        <Text style={styles.flowName} numberOfLines={1}>
+          {flow.name}
+        </Text>
+      </View>
+
+      <FlatList
+        ref={listRef}
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        data={steps}
+        keyExtractor={(item) => item.nodeId}
+        renderItem={({ item, index }) => (
+          <View style={styles.stepCard}>
+            <Text style={styles.stepBadge}>
+              {index + 1}. {item.agentName}
+            </Text>
+            <MarkdownText content={item.output} textStyle={styles.stepText} />
+            <Text style={styles.stepMeta}>
+              {item.stats.tokens} tok · {item.stats.tokensPerSecond.toFixed(1)} tok/s
+            </Text>
+          </View>
+        )}
+        ListEmptyComponent={
+          !running ? (
+            <View style={styles.emptyWrap}>
+              <Text style={styles.emptyTitle}>Ready to run</Text>
+              <Text style={styles.emptySubtitle}>Enter an input below to start the chain.</Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          activeStep ? (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepBadge}>
+                {steps.length + 1}. {activeStep.agentName} — working...
+              </Text>
+              {activeStep.partialText ? (
+                <MarkdownText content={activeStep.partialText} textStyle={styles.stepText} />
+              ) : (
+                <TypingDots />
+              )}
+            </View>
+          ) : finalResult ? (
+            <View style={styles.finalCard}>
+              <Text style={styles.finalBadge}>FINAL RESULT</Text>
+              <MarkdownText content={finalResult} textStyle={styles.finalText} />
+            </View>
+          ) : error ? (
+            <View style={styles.finalCard}>
+              <Text style={styles.errorBadge}>ERROR</Text>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null
+        }
+      />
+
+      <View style={styles.inputRow}>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder="Enter input for this flow..."
+          placeholderTextColor={colors.textSecondary}
+          style={styles.input}
+          multiline
+          editable={!running}
+        />
+        <Button label={running ? "Running..." : "▶"} onPress={run} variant="primary" loading={running} disabled={!input.trim()} />
+      </View>
+    </View>
+  );
+}
+
+function createStyles(colors: ColorPalette) {
+  const screen = createScreenStyles(colors);
+  return StyleSheet.create({
+    container: screen.container,
+    topBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+    },
+    backButton: { paddingHorizontal: spacing.sm },
+    backButtonLabel: { color: colors.accent, fontSize: 28, fontWeight: "700" },
+    flowName: { flex: 1, color: colors.textPrimary, fontSize: 16, fontWeight: "700", marginHorizontal: spacing.sm },
+    list: { flex: 1 },
+    listContent: { padding: spacing.md, paddingBottom: spacing.xl },
+    emptyWrap: { alignItems: "center", marginTop: spacing.xl, gap: spacing.xs },
+    emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700" },
+    emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
+    stepCard: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderTopWidth: 3,
+      borderTopColor: colors.accentSecondary,
+      backgroundColor: colors.surfaceAlt,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    stepBadge: { color: colors.accentSecondary, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
+    stepText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20, textAlign: "justify" },
+    stepMeta: { color: colors.running, fontFamily: "monospace", fontSize: 10, marginTop: spacing.xs },
+    finalCard: {
+      borderWidth: 1,
+      borderColor: colors.accent,
+      borderTopWidth: 3,
+      borderTopColor: colors.accent,
+      backgroundColor: colors.accent + "18",
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+    },
+    finalBadge: { color: colors.accent, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
+    finalText: { color: colors.textPrimary, fontSize: 15, lineHeight: 21, textAlign: "justify" },
+    errorBadge: { color: colors.error, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
+    errorText: { color: colors.error, fontSize: 13 },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.surface,
+      padding: spacing.sm,
+    },
+    input: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.textPrimary,
+      backgroundColor: colors.surfaceAlt,
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.sm,
+      maxHeight: 100,
+    },
+  });
+}

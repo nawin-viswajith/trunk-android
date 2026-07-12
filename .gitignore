@@ -4,9 +4,6 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/.pytest_cache/
 backend/**/.pytest_cache/
-backend/*.db
-backend/logs/*.log
-backend/workspace/models/*.gguf
 backend/.env
 *.pyc
 
@@ -29,3 +26,6 @@ app/.env*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Built APKs — large binaries, never committed
+*.apk
