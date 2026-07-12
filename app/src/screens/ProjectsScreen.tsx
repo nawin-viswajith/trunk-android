@@ -1,15 +1,38 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
+import { TextInput } from "../components/TextInput";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { CreateProjectModal, NewProjectParams } from "../components/CreateProjectModal";
+import { GuideStep } from "../components/PageGuideModal";
 import { ProjectCard } from "../components/ProjectCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { StatsBar } from "../components/StatsBar";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { useProjectStore } from "../state/useProjectStore";
 import { listLocalModels, LocalModel } from "../services/modelStorage";
 import { fuzzyMatch } from "../utils/fuzzy";
+
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    title: "What's a project",
+    description: "A project binds a downloaded model to a set of generation settings — temperature, top-p, top-k, context length, max tokens.",
+  },
+  {
+    title: "Create one",
+    description: "Tap + to name a project, pick a downloaded model, and tune its generation settings.",
+  },
+  {
+    title: "Open it up",
+    description: "Tap a project to review or edit its settings, run a benchmark, or jump into Inference to chat with it.",
+  },
+  {
+    title: "Manage",
+    description: "Hold a project to select it (and others) for bulk delete — this also removes its chat history.",
+  },
+];
 
 export function ProjectsScreen({ navigation }: any) {
   const colors = useColors();
@@ -70,7 +93,7 @@ export function ProjectsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Projects" showActions />
+      <ScreenHeader title="Projects" showActions guideSteps={GUIDE_STEPS} />
       {projects.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
@@ -125,12 +148,10 @@ export function ProjectsScreen({ navigation }: any) {
       />
 
       {!selectionMode ? (
-        <View style={styles.statsBar}>
-          <Text style={styles.statsBarText}>
-            {projects.length} project{projects.length === 1 ? "" : "s"} · {sessions.length} chat session
-            {sessions.length === 1 ? "" : "s"}
-          </Text>
-        </View>
+        <StatsBar
+          left={`${projects.length} project${projects.length === 1 ? "" : "s"}`}
+          right={`${sessions.length} chat session${sessions.length === 1 ? "" : "s"}`}
+        />
       ) : null}
 
       <CreateProjectModal visible={createOpen} onClose={() => setCreateOpen(false)} models={models} onCreate={handleCreate} />
@@ -186,14 +207,6 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    statsBar: {
-      backgroundColor: colors.surfaceAlt,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
-    },
-    statsBarText: { color: colors.textSecondary, fontSize: 11, textAlign: "center" },
     fab: {
       position: "absolute",
       right: spacing.md,

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+﻿import React, { useEffect, useMemo, useRef } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
 import { ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
@@ -6,7 +6,7 @@ import { useColors } from "../theme/ThemeContext";
 const SEGMENT_WIDTH = 120;
 
 /** For operations with no real progress signal (e.g. a local file copy via
- * expo-file-system, which doesn't expose byte-level progress) -- an honest
+ * expo-file-system, which doesn't expose byte-level progress) — an honest
  * "work is happening" indicator instead of a fake percentage. */
 export function IndeterminateProgressBar() {
   const colors = useColors();

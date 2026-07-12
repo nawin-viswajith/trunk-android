@@ -1,16 +1,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
+import { TextInput } from "../components/TextInput";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { IndeterminateProgressBar } from "../components/IndeterminateProgressBar";
 import { ModelCard } from "../components/ModelCard";
 import { ModelInfoModal } from "../components/ModelInfoModal";
+import { GuideStep } from "../components/PageGuideModal";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { StatsBar } from "../components/StatsBar";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { deleteLocalModel, getTotalStorageUsed, importModelFromDevice, listLocalModels, LocalModel } from "../services/modelStorage";
 import { formatBytes } from "../utils/format";
 import { fuzzyMatch } from "../utils/fuzzy";
+import { showAlert } from "../state/useAlertStore";
+import { flushDownloadProgress, useDownloadStore } from "../state/useDownloadStore";
+
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    title: "Browse & download",
+    description: "Tap + then \"Browse Hugging Face\" to search GGUF models and download one straight to your device.",
+  },
+  {
+    title: "Import your own",
+    description: "Already have a GGUF file? Tap + then \"Import from Device\" instead of downloading.",
+  },
+  {
+    title: "Check the details",
+    description: "Tap a model to see its quantization and size, and whether it comfortably fits your device's RAM.",
+  },
+  {
+    title: "Free up space",
+    description: "Hold a model to select it (and others) for bulk delete, freeing up storage.",
+  },
+];
 
 export function ModelsScreen({ navigation }: any) {
   const colors = useColors();
@@ -26,6 +51,8 @@ export function ModelsScreen({ navigation }: any) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [infoModel, setInfoModel] = useState<LocalModel | null>(null);
   const selectionMode = selectedNames.size > 0;
+  const downloads = useDownloadStore((s) => s.downloads);
+  const activeDownloads = Object.values(downloads);
 
   const filteredModels = useMemo(() => {
     if (!query.trim()) return models;
@@ -48,6 +75,7 @@ export function ModelsScreen({ navigation }: any) {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    activeDownloads.forEach((d) => flushDownloadProgress(d.filename));
     await load();
     setRefreshing(false);
   };
@@ -86,7 +114,7 @@ export function ModelsScreen({ navigation }: any) {
       const imported = await importModelFromDevice();
       if (imported) await load();
     } catch (err) {
-      Alert.alert("Import failed", String(err));
+      showAlert("Import failed", String(err));
     } finally {
       setImporting(false);
     }
@@ -99,7 +127,7 @@ export function ModelsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Models" showActions />
+      <ScreenHeader title="Models" showActions guideSteps={GUIDE_STEPS} />
       <View style={styles.toolbar}>
         {models.length > 0 ? (
           <View style={styles.searchRow}>
@@ -125,6 +153,29 @@ export function ModelsScreen({ navigation }: any) {
             <IndeterminateProgressBar />
           </View>
         ) : null}
+        {activeDownloads.map((d) =>
+          d.status === "failed" ? (
+            <View key={d.filename} style={styles.downloadBannerFailed}>
+              <View style={styles.downloadBannerTextWrap}>
+                <Text style={styles.downloadBannerFailedLabel} numberOfLines={1}>
+                  {d.filename} — download failed
+                </Text>
+              </View>
+              <Pressable onPress={() => useDownloadStore.getState().clearDownload(d.filename)} hitSlop={10}>
+                <Text style={styles.downloadBannerDismiss}>×</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View key={d.filename} style={styles.downloadBanner}>
+              <Text style={styles.downloadBannerLabel} numberOfLines={1}>
+                Downloading {d.filename} — {(d.progress * 100).toFixed(0)}%
+              </Text>
+              <View style={styles.downloadBannerTrack}>
+                <View style={[styles.downloadBannerFill, { width: `${Math.min(100, d.progress * 100)}%` }]} />
+              </View>
+            </View>
+          )
+        )}
       </View>
       <FlatList
         style={styles.flatList}
@@ -140,6 +191,7 @@ export function ModelsScreen({ navigation }: any) {
             selected={selectedNames.has(item.filename)}
             onToggleSelect={() => toggleSelected(item.filename)}
             onLongPress={() => toggleSelected(item.filename)}
+            downloadProgress={downloads[item.filename]?.status === "downloading" ? downloads[item.filename].progress : undefined}
           />
         )}
         ListEmptyComponent={
@@ -157,13 +209,7 @@ export function ModelsScreen({ navigation }: any) {
         }
       />
 
-      {!selectionMode ? (
-        <View style={styles.statsBar}>
-          <Text style={styles.statsBarText}>
-            {models.length} downloaded · {formatBytes(totalUsed)} used
-          </Text>
-        </View>
-      ) : null}
+      {!selectionMode ? <StatsBar left={`${models.length} downloaded`} right={`${formatBytes(totalUsed)} used`} /> : null}
 
       {menuOpen ? (
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
@@ -249,20 +295,35 @@ function createStyles(colors: ColorPalette) {
     clearButtonLabel: { color: colors.textSecondary, fontSize: 16, fontWeight: "700" },
     importBanner: { marginTop: spacing.sm, gap: spacing.xs },
     importBannerLabel: { color: colors.textSecondary, fontSize: 12 },
+    downloadBanner: {
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: colors.surface,
+      padding: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    downloadBannerLabel: { color: colors.textPrimary, fontSize: 12, fontFamily: "monospace", marginBottom: spacing.xs },
+    downloadBannerTrack: { height: 4, backgroundColor: colors.surfaceAlt },
+    downloadBannerFill: { height: 4, backgroundColor: colors.accent },
+    downloadBannerFailed: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      borderWidth: 1,
+      borderColor: colors.error,
+      backgroundColor: colors.surface,
+      padding: spacing.sm,
+      marginTop: spacing.sm,
+    },
+    downloadBannerTextWrap: { flex: 1, marginRight: spacing.sm },
+    downloadBannerFailedLabel: { color: colors.error, fontSize: 12, fontFamily: "monospace" },
+    downloadBannerDismiss: { color: colors.error, fontSize: 16, fontWeight: "700" },
     flatList: { flex: 1 },
     list: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl * 2 },
     emptyListContent: { flexGrow: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: spacing.md },
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    statsBar: {
-      backgroundColor: colors.surfaceAlt,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      paddingVertical: spacing.xs,
-      paddingHorizontal: spacing.md,
-    },
-    statsBarText: { color: colors.textSecondary, fontSize: 11, textAlign: "center" },
     fab: {
       position: "absolute",
       right: spacing.md,

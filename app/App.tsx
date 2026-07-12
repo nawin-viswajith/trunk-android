@@ -1,8 +1,5 @@
-// Copyright © 2026 TuskerLabs. All rights reserved.
-// Unauthorized copying of this file, via any medium, is strictly prohibited.
-
 import "react-native-gesture-handler";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -14,6 +11,9 @@ import { OnboardingFlow } from "./src/screens/onboarding/OnboardingFlow";
 import { ThemeProvider, useColors, useThemeScheme } from "./src/theme/ThemeContext";
 import { useSettingsStore } from "./src/state/useSettingsStore";
 import { useProjectStore } from "./src/state/useProjectStore";
+import { useAppFonts } from "./src/theme/fonts";
+import { showAlert } from "./src/state/useAlertStore";
+import { isBatteryOptimizationExempt, requestBatteryOptimizationExemption } from "./src/services/batteryOptimization";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -22,11 +22,13 @@ function AppInner() {
   const scheme = useThemeScheme();
   const hasOnboarded = useSettingsStore((s) => s.hasOnboarded);
   const [bootDone, setBootDone] = useState(false);
+  const fontsLoaded = useAppFonts();
+  const batteryPromptShown = useRef(false);
 
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
     // A fresh random minimum each launch (1.5-2.5s) so the splash doesn't
-    // feel identical every time -- but real store rehydration always wins
+    // feel identical every time — but real store rehydration always wins
     // if it takes longer than that minimum.
     const minDuration = 1500 + Math.random() * 1000;
     const start = Date.now();
@@ -50,6 +52,26 @@ function AppInner() {
     };
   }, []);
 
+  useEffect(() => {
+    // Checked once per fresh app process, only once onboarding is already
+    // done (first-ever launch has its own flow to get through first) — if
+    // the user dismisses this, Settings > Performance still offers the same
+    // action, so nothing is lost by skipping it here.
+    if (!bootDone || !hasOnboarded || batteryPromptShown.current) return;
+    batteryPromptShown.current = true;
+    isBatteryOptimizationExempt().then((exempt) => {
+      if (exempt) return;
+      showAlert(
+        "Keep Trunk running in the background?",
+        "Downloads and inference are less likely to be interrupted if Trunk is exempt from battery optimization. You can always change this later in Settings.",
+        [
+          { label: "Not now", variant: "neutral" },
+          { label: "Allow", onPress: requestBatteryOptimizationExemption },
+        ]
+      );
+    });
+  }, [bootDone, hasOnboarded]);
+
   const navigationTheme = {
     ...(scheme === "light" ? DefaultTheme : DarkTheme),
     colors: {
@@ -62,7 +84,7 @@ function AppInner() {
     },
   };
 
-  if (!bootDone) {
+  if (!bootDone || !fontsLoaded) {
     return <BootSplash />;
   }
 

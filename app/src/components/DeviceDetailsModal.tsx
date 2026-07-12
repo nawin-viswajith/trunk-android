@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Button } from "./Button";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
@@ -32,7 +33,6 @@ export function DeviceDetailsModal({ visible, onClose }: { visible: boolean; onC
       list.push(
         { label: "Manufacturer", value: details.manufacturer },
         { label: "Model", value: `${details.brand} ${details.model}` },
-        { label: "Chipset ID", value: details.deviceId },
         { label: "OS", value: `${details.systemName} ${details.systemVersion} (API ${details.apiLevel})` },
         { label: "CPU ABIs", value: details.supportedAbis.join(", ") }
       );
@@ -63,10 +63,6 @@ export function DeviceDetailsModal({ visible, onClose }: { visible: boolean; onC
               <Text style={styles.value}>{r.value}</Text>
             </View>
           ))}
-          <Text style={styles.note}>
-            CPU/GPU clock speed, core count, GPU/NPU model, and RAM/storage type or speed aren't exposed by any
-            public Android API to a regular app -- not shown here because there's no reliable way to read them.
-          </Text>
           <View style={styles.buttonRow}>
             <Button label="Close" onPress={onClose} variant="secondary" />
           </View>
@@ -97,7 +93,6 @@ function createStyles(colors: ColorPalette) {
     row: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
     label: { color: colors.textSecondary, fontSize: 12 },
     value: { color: colors.textPrimary, fontSize: 12, fontFamily: "monospace", flexShrink: 1, textAlign: "right" },
-    note: { color: colors.textSecondary, fontSize: 11, marginTop: spacing.xs, lineHeight: 16 },
     buttonRow: { marginTop: spacing.sm },
   });
 }

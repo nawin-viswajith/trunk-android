@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
-import { StyleSheet, Text, TextStyle, View } from "react-native";
+﻿import React, { useMemo } from "react";
+import { StyleSheet, TextStyle, View } from "react-native";
+import { Text } from "./Text";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
@@ -57,7 +58,7 @@ interface MarkdownTextProps {
   textStyle: TextStyle;
 }
 
-/** Lightweight markdown for chat responses -- fenced code blocks, inline
+/** Lightweight markdown for chat responses — fenced code blocks, inline
  * code, bold and italic. Not a full CommonMark parser, just what model
  * output actually uses. */
 export function MarkdownText({ content, textStyle }: MarkdownTextProps) {

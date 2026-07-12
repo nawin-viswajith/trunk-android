@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { Text } from "../../components/Text";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../components/Button";
 import { ThemeModeSection, ColorPaletteSection } from "../../components/AppearanceSettings";
 import { ColorPalette, DEFAULT_ACCENT_PRESET, spacing } from "../../theme/colors";
 import { useColors, useThemeScheme } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
+import { PERFORMANCE_DISCLAIMER } from "../../copy/disclaimers";
 
 const SLIDES = [
   {
@@ -22,7 +24,7 @@ const SLIDES = [
   },
 ];
 
-type Phase = "slides" | "warning" | "setup";
+type Phase = "slides" | "warning" | "deviceWarning" | "setup";
 
 export function OnboardingFlow() {
   const colors = useColors();
@@ -95,6 +97,19 @@ export function OnboardingFlow() {
             </Text>
           </View>
           <View style={styles.footerSingle}>
+            <Button label="I Understand, Continue" variant="primary" onPress={() => setPhase("deviceWarning")} />
+          </View>
+        </>
+      ) : null}
+
+      {phase === "deviceWarning" ? (
+        <>
+          <View style={styles.body}>
+            <Text style={styles.warningTitle}>⚠ {PERFORMANCE_DISCLAIMER.title}</Text>
+            <Text style={styles.text}>{PERFORMANCE_DISCLAIMER.body}</Text>
+            <Text style={styles.warningEmphasis}>{PERFORMANCE_DISCLAIMER.emphasis}</Text>
+          </View>
+          <View style={styles.footerSingle}>
             <Button label="I Understand, Continue" variant="primary" onPress={() => setPhase("setup")} />
           </View>
         </>
@@ -121,7 +136,7 @@ export function OnboardingFlow() {
                 value={showInferenceStats}
                 onValueChange={setShowInferenceStats}
                 trackColor={{ false: colors.border, true: colors.accent }}
-                thumbColor={colors.surface}
+                thumbColor={colors.textPrimary}
               />
             </View>
           </ScrollView>

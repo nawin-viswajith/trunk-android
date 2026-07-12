@@ -1,10 +1,10 @@
-import React, { useMemo } from "react";
+﻿import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
 /** A classic checkbox look (filled square + check mark). The check is drawn
- * from two borders rotated into a "L" rather than a text glyph -- Unicode
+ * from two borders rotated into a "L" rather than a text glyph — Unicode
  * "✓" renders with soft/curved strokes on most fonts and looked blurry at
  * this size. */
 export function CheckIndicator({ checked }: { checked: boolean }) {

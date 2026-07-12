@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { CheckIndicator } from "./CheckIndicator";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";

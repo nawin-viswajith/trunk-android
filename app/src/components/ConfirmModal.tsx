@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+﻿import React, { useMemo } from "react";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { Button } from "./Button";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
@@ -15,7 +16,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
 }
 
-/** App-styled replacement for Alert.alert() confirmations -- the native
+/** App-styled replacement for Alert.alert() confirmations — the native
  * Android dialog looks out of place against the rest of the flat, sharp-edged
  * design, so every "are you sure?" prompt (delete project, bulk delete, etc.)
  * should route through this instead. */

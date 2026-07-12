@@ -1,13 +1,16 @@
-// Copyright © 2026 TuskerLabs. All rights reserved.
-// Unauthorized copying of this file, via any medium, is strictly prohibited.
-
-import { initLlama, LlamaContext } from "llama.rn";
+﻿import { initLlama, LlamaContext } from "llama.rn";
+import { useSettingsStore } from "../state/useSettingsStore";
 
 export interface EngineParams {
   contextLength: number;
   threads?: number;
   nGpuLayers?: number;
 }
+
+/** Lite Mode's fixed low thread count — deliberately not scaled to the
+ * device's core count, since the point is a predictable low-CPU floor rather
+ * than "half of whatever this phone has." */
+const LITE_MODE_THREADS = 2;
 
 export interface CompletionParams {
   messages: { role: "system" | "user" | "assistant"; content: string }[];
@@ -31,9 +34,14 @@ export interface CompletionResult {
 
 let activeContext: LlamaContext | null = null;
 let activeModelPath: string | null = null;
+let activeThreads: number | undefined;
 
 export async function ensureLoaded(modelPath: string, params: EngineParams): Promise<void> {
-  if (activeModelPath === modelPath && activeContext) return;
+  const effectiveThreads = params.threads ?? (useSettingsStore.getState().liteMode ? LITE_MODE_THREADS : undefined);
+  // Thread count is fixed at load time by initLlama — toggling Lite Mode
+  // while a model is already loaded must force a reload, or the change
+  // silently wouldn't take effect until a different model was picked.
+  if (activeModelPath === modelPath && activeContext && activeThreads === effectiveThreads) return;
 
   if (activeContext) {
     await activeContext.release();
@@ -44,10 +52,11 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
   activeContext = await initLlama({
     model: modelPath,
     n_ctx: params.contextLength,
-    n_threads: params.threads,
+    n_threads: effectiveThreads,
     n_gpu_layers: params.nGpuLayers ?? 0,
   });
   activeModelPath = modelPath;
+  activeThreads = effectiveThreads;
 }
 
 export async function releaseEngine(): Promise<void> {
@@ -62,6 +71,13 @@ export function isLoaded(modelPath: string): boolean {
   return activeModelPath === modelPath && !!activeContext;
 }
 
+/** Whichever model is currently loaded, if any — lets screens with no
+ * model of their own (e.g. the Agent Library's "craft with AI") check
+ * readiness without needing to know a specific path up front. */
+export function getActiveModelPath(): string | null {
+  return activeContext ? activeModelPath : null;
+}
+
 export interface BenchmarkResult {
   loadTimeMs: number;
   tokens: number;
@@ -72,7 +88,7 @@ const BENCHMARK_PROMPT = "Write one short sentence about the ocean.";
 const BENCHMARK_MAX_TOKENS = 48;
 
 /** A lightweight integrity/perf check: load the model fresh and run one small
- * fixed prompt. Throws if the model fails to load or complete -- that failure
+ * fixed prompt. Throws if the model fails to load or complete — that failure
  * itself is the "integrity" signal; a clean run reports load time + tok/s. */
 export async function benchmarkModel(modelPath: string, contextLength: number): Promise<BenchmarkResult> {
   await releaseEngine();

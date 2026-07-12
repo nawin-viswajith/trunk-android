@@ -1,7 +1,7 @@
-import { StyleSheet } from "react-native";
+﻿import { StyleSheet } from "react-native";
 import { ColorPalette } from "./colors";
 
-/** Shared container shape used by every screen -- the title/header row
+/** Shared container shape used by every screen — the title/header row
  * itself lives in <ScreenHeader>; this just keeps the background/flex
  * consistent so it can't drift screen-by-screen. */
 export function createScreenStyles(colors: ColorPalette) {

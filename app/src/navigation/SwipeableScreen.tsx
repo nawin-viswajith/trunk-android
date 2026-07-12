@@ -1,12 +1,12 @@
-import React from "react";
+﻿import React from "react";
 import { View } from "react-native";
 import { Directions, Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useNavigation, useNavigationState } from "@react-navigation/native";
 
-const TAB_ORDER = ["Home", "Models", "Projects", "Inference"];
+const TAB_ORDER = ["Home", "Models", "Projects", "Playground", "Inference"];
 
 /** Wraps a root tab screen so a left/right fling switches to the
- * adjacent tab -- calls the same navigation.navigate() a tab-bar tap
+ * adjacent tab — calls the same navigation.navigate() a tab-bar tap
  * would, so cross-tab routes (returnTo, nested stacks) keep working
  * exactly as before; this only adds a gesture shortcut on top. */
 export function SwipeableScreen({ children }: { children: React.ReactNode }) {

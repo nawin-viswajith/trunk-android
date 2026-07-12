@@ -49,16 +49,26 @@ async function getDeviceMemory(): Promise<{ totalMb: number; availableMb: number
 
 // Empirical, not a physical law: derived from a real Qwen2.5-Coder-7B Q4_0
 // GGUF (4,431,390,720 bytes / 7B params ~= 604 MB per billion params at Q4).
-// Other quantizations/architectures will vary - this is only for the
-// proactive "suggested model size" indicator, not the per-file compatibility
-// check above (which always uses the file's real size once known).
+// Q2/Q8 are scaled from that same anchor by typical relative bits-per-weight
+// (roughly 2.6/4.5 and 8.5/4.5 of Q4's footprint). Other quantizations/
+// architectures will vary - this is only for the proactive "suggested model
+// size" indicator, not the per-file compatibility check above (which always
+// uses the file's real size once known).
 const MB_PER_BILLION_PARAMS_Q4 = 604;
+export const QUANT_MB_PER_BILLION_PARAMS: { quant: string; mbPerBillion: number }[] = [
+  { quant: "Q2", mbPerBillion: Math.round(MB_PER_BILLION_PARAMS_Q4 * (2.6 / 4.5)) },
+  { quant: "Q4", mbPerBillion: MB_PER_BILLION_PARAMS_Q4 },
+  { quant: "Q8", mbPerBillion: Math.round(MB_PER_BILLION_PARAMS_Q4 * (8.5 / 4.5)) },
+];
 
 export interface SuggestedModelBudget {
   maxFileSizeMb: number;
   maxParamsBillion: number;
   totalMb: number;
   availableMb: number;
+  /** Same maxFileSizeMb budget, converted to a param count per quant level -
+   * a lower-bit quant fits more parameters in the same RAM footprint. */
+  perQuant: { quant: string; maxParamsBillion: number }[];
 }
 
 export async function getDeviceMemoryInfo(): Promise<{ totalMb: number; availableMb: number } | null> {
@@ -78,6 +88,10 @@ export async function getSuggestedModelBudget(): Promise<SuggestedModelBudget | 
     maxParamsBillion: maxFileSizeMb / MB_PER_BILLION_PARAMS_Q4,
     totalMb: memory.totalMb,
     availableMb: memory.availableMb,
+    perQuant: QUANT_MB_PER_BILLION_PARAMS.map(({ quant, mbPerBillion }) => ({
+      quant,
+      maxParamsBillion: maxFileSizeMb / mbPerBillion,
+    })),
   };
 }
 

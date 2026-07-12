@@ -26,3 +26,6 @@ app/.env*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Built APKs — large binaries, never committed
+*.apk

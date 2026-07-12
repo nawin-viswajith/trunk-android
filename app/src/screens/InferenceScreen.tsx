@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
+import { TextInput } from "../components/TextInput";
 import { Button } from "../components/Button";
 import { ChatBubble } from "../components/ChatBubble";
 import { PickerModal } from "../components/PickerModal";
+import { GuideStep } from "../components/PageGuideModal";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
@@ -15,8 +18,11 @@ import {
 } from "../state/useProjectStore";
 import { modelPath, isModelDownloaded } from "../services/modelStorage";
 import { ensureLoaded, complete } from "../services/llamaEngine";
+import { runFlow } from "../services/flowRunner";
+import { useFlowStore } from "../state/useFlowStore";
 import { formatInferenceStats } from "../utils/format";
 import { useSettingsStore } from "../state/useSettingsStore";
+import { showAlert } from "../state/useAlertStore";
 
 interface ChatMessage {
   id: string;
@@ -26,8 +32,9 @@ interface ChatMessage {
 }
 
 const NEW_CHAT_VALUE = "__new__";
+const NO_FLOW_VALUE = "__none__";
 // Heuristic cap on how many prior exchanges get replayed into the model's
-// context each turn -- keeps prompt size bounded on long-running chats
+// context each turn — keeps prompt size bounded on long-running chats
 // without needing to reason about the project's exact context_length in tokens.
 const MAX_CONTEXT_EXCHANGES = 10;
 
@@ -53,6 +60,25 @@ function randomPlaceholder(): string {
   return PLACEHOLDER_TEXTS[Math.floor(Math.random() * PLACEHOLDER_TEXTS.length)];
 }
 
+const GUIDE_STEPS: GuideStep[] = [
+  {
+    title: "Pick what to chat with",
+    description: "The Project chip picks which model + settings you're using. The Flow chip optionally routes your message through a saved agent chain instead of straight to the model.",
+  },
+  {
+    title: "Chats",
+    description: "The Chat chip switches between sessions for the current project, or starts a new one — each keeps its own separate history.",
+  },
+  {
+    title: "Send & stream",
+    description: "Type a message and send it — the response streams token-by-token, fully on-device.",
+  },
+  {
+    title: "Stats",
+    description: "Turn on inference stats in Settings to see token count and tokens/second under each reply.",
+  },
+];
+
 export function InferenceScreen({ route, navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -65,13 +91,17 @@ export function InferenceScreen({ route, navigation }: any) {
   const createSession = useProjectStore((s) => s.createSession);
   const ensureDefaultSession = useProjectStore((s) => s.ensureDefaultSession);
   const showInferenceStats = useSettingsStore((s) => s.showInferenceStats);
+  const flows = useFlowStore((s) => s.flows);
+  const agents = useFlowStore((s) => s.agents);
   const [activeProjectId, setActiveProjectId] = useState<string | undefined>(projectIdParam);
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>(undefined);
+  const [activeFlowId, setActiveFlowId] = useState<string | undefined>(undefined);
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
   const [pendingExchange, setPendingExchange] = useState<{ prompt: string; output: string } | null>(null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
+  const [flowPickerOpen, setFlowPickerOpen] = useState(false);
   const [placeholder, setPlaceholder] = useState(randomPlaceholder);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -95,7 +125,7 @@ export function InferenceScreen({ route, navigation }: any) {
 
   useEffect(() => {
     // Tab bar is set to hide on keyboard (tabBarHideOnKeyboard), so it no
-    // longer reserves space underneath -- padding by the raw keyboard height
+    // longer reserves space underneath — padding by the raw keyboard height
     // is now correct without double-counting.
     const showEvent = Platform.OS === "android" ? "keyboardDidShow" : "keyboardWillShow";
     const hideEvent = Platform.OS === "android" ? "keyboardDidHide" : "keyboardWillHide";
@@ -115,6 +145,16 @@ export function InferenceScreen({ route, navigation }: any) {
   const activeSession = useMemo(
     () => projectSessions.find((s) => s.id === activeSessionId),
     [projectSessions, activeSessionId]
+  );
+  const activeFlow = useMemo(() => flows.find((f) => f.id === activeFlowId), [flows, activeFlowId]);
+  // Flows fundamentally change how a "conversation" behaves (a different
+  // agent chain instead of the model directly), so — unlike Project, which
+  // already moves you to a different session when switched — nothing should
+  // let flow-routed and direct-chat messages mix in one thread. Lock the
+  // picker once the active session already has history.
+  const sessionHasHistory = useMemo(
+    () => !!activeSessionId && selectHistoryForSession(history, activeSessionId).length > 0,
+    [history, activeSessionId]
   );
 
   const goToProjectDetail = useCallback(() => {
@@ -147,14 +187,32 @@ export function InferenceScreen({ route, navigation }: any) {
   }, [history, activeSessionId, pendingExchange, showInferenceStats]);
 
   const send = useCallback(async () => {
-    if (!activeProject?.modelFilename || !prompt.trim() || !activeSessionId) return;
+    if (!prompt.trim() || !activeProject || !activeSessionId) return;
     const trimmedPrompt = prompt.trim();
     setPrompt("");
     setPendingExchange({ prompt: trimmedPrompt, output: "" });
     setRunning(true);
     try {
+      if (activeFlow) {
+        const result = await runFlow(activeFlow, agents, trimmedPrompt, () => {});
+        addHistoryEntry({
+          projectId: activeProject.id,
+          sessionId: activeSessionId,
+          prompt: trimmedPrompt,
+          response: result,
+          tokensGenerated: 0,
+          tokensPerSecond: 0,
+          promptTokens: 0,
+          promptTokensPerSecond: 0,
+          totalMs: 0,
+          viaFlowId: activeFlow.id,
+        });
+        return;
+      }
+
+      if (!activeProject.modelFilename) return;
       if (!(await isModelDownloaded(activeProject.modelFilename))) {
-        Alert.alert("Model not found", "This project's model is no longer downloaded. Assign a different one.");
+        showAlert("Model not found", "This project's model is no longer downloaded. Assign a different one.");
         return;
       }
 
@@ -196,16 +254,16 @@ export function InferenceScreen({ route, navigation }: any) {
         totalMs: result.totalMs,
       });
     } catch (err) {
-      Alert.alert("Inference error", String(err));
+      showAlert("Inference error", String(err));
     } finally {
       setRunning(false);
       setPendingExchange(null);
     }
-  }, [activeProject, activeSessionId, prompt, history, addHistoryEntry]);
+  }, [activeProject, activeSessionId, activeFlow, agents, prompt, history, addHistoryEntry]);
 
   return (
     <View style={[styles.container, { paddingBottom: keyboardHeight ? keyboardHeight + spacing.md : 0 }]}>
-      <ScreenHeader title="Inference" showActions />
+      <ScreenHeader title="Inference" showActions guideSteps={GUIDE_STEPS} />
       <View style={styles.switcherRow}>
         <Pressable
           onPress={() => setProjectPickerOpen(true)}
@@ -243,6 +301,28 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.switcherCaret}>›</Text>
           </View>
         </Pressable>
+        <Pressable
+          onPress={() => {
+            if (sessionHasHistory) {
+              showAlert(
+                "Flow locked for this chat",
+                "Flows are locked once a chat has messages, so a conversation never mixes flow-routed and direct responses. Start a new chat (via the Chat picker) to use a different flow.",
+                [{ label: "OK" }]
+              );
+              return;
+            }
+            setFlowPickerOpen(true);
+          }}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+        >
+          <Text style={styles.switcherRole}>Flow</Text>
+          <View style={styles.switcherValueRow}>
+            <Text style={styles.switcherLabel} numberOfLines={1}>
+              {activeFlow?.name ?? "Direct chat"}
+            </Text>
+            <Text style={styles.switcherCaret}>›</Text>
+          </View>
+        </Pressable>
       </View>
 
       <PickerModal
@@ -269,6 +349,15 @@ export function InferenceScreen({ route, navigation }: any) {
           }
         }}
         onClose={() => setSessionPickerOpen(false)}
+      />
+      <PickerModal
+        visible={flowPickerOpen}
+        title="Run via Flow"
+        options={[{ label: "Direct chat (no Flow)", value: NO_FLOW_VALUE }, ...flows.map((f) => ({ label: f.name, value: f.id }))]}
+        selectedValue={activeFlowId ?? NO_FLOW_VALUE}
+        onSelect={(value) => setActiveFlowId(value === NO_FLOW_VALUE ? undefined : value)}
+        onClose={() => setFlowPickerOpen(false)}
+        emptyLabel="No saved flows yet - build one in the Playground tab."
       />
 
       <FlatList
@@ -307,7 +396,7 @@ export function InferenceScreen({ route, navigation }: any) {
           label="➤"
           onPress={send}
           loading={running}
-          disabled={!activeProject?.modelFilename}
+          disabled={activeFlow ? !(activeFlow.modelFilename && activeFlow.startNodeId) : !activeProject?.modelFilename}
           labelStyle={styles.sendIcon}
         />
       </View>

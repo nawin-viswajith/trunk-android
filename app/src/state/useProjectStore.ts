@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
@@ -27,7 +27,7 @@ export interface HistoryEntry {
   id: string;
   projectId: string;
   /** Absent on entries saved before multi-session chat existed; treat as
-   * "not yet migrated" -- ensureDefaultSession() backfills these once. */
+   * "not yet migrated" — ensureDefaultSession() backfills these once. */
   sessionId?: string;
   prompt: string;
   response: string;
@@ -37,6 +37,11 @@ export interface HistoryEntry {
   promptTokensPerSecond: number;
   totalMs: number;
   timestamp: number;
+  /** Set when this reply came from running a Playground Flow rather than
+   * talking to the project's model directly — token stats are zeroed for
+   * these (runFlow doesn't expose aggregate stats), so callers computing
+   * speed/token analytics should exclude them. */
+  viaFlowId?: string;
 }
 
 export interface NewHistoryEntry {
@@ -49,6 +54,7 @@ export interface NewHistoryEntry {
   promptTokens: number;
   promptTokensPerSecond: number;
   totalMs: number;
+  viaFlowId?: string;
 }
 
 function randomId(): string {

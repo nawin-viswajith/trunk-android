@@ -2,13 +2,15 @@
 
 **by TuskerLabs**
 
+Local inference engine for LLMs on your phone.
+
 An Android app that runs LLMs entirely on-device - search Hugging Face,
 download a GGUF model straight to your phone, and chat with it completely
 offline. No cloud, no server, and no account required to use the app; nothing
 you type is synced anywhere.
 
-> Trunk is a proprietary product built by TuskerLabs. See [`LICENSE`](LICENSE)
-> - this is not an open-source project.
+Open source, MIT licensed - see [`LICENSE`](LICENSE). Contributions and
+issues welcome.
 
 ## Architecture
 
@@ -81,13 +83,29 @@ uvicorn app.main:app --reload
    inference parameters (temperature, top-p, top-k, context length, max
    tokens), and review per-session token/speed history. Hold a project or
    model tile to multi-select and bulk-delete.
-5. **Inference** - chat with the model; runs fully on-device via `llama.rn`.
-   Multiple chat sessions per project, prior turns are replayed as context,
-   markdown (code blocks, inline code, bold/italic) renders in responses,
-   and a project's model is only ever assigned from Project Detail.
+5. **Playground** - build reusable **Agents** (a name + system prompt,
+   hand-written or drafted by the loaded model from a plain-language
+   description) and wire several into a linear **Flow**, chaining each
+   agent's output into the next agent's input. Running a flow streams each
+   step live and shows step-by-step + final output.
+6. **Inference** - chat with a project's model, or run a saved Flow instead;
+   runs fully on-device via `llama.rn`. Multiple chat sessions per project,
+   prior turns are replayed as context, markdown (code blocks, inline code,
+   bold/italic) renders in responses.
 
-Swipe left/right on any of the four main tabs (Home, Models, Projects,
-Inference) to move between them, in addition to tapping the tab bar.
+Swipe left/right on any of the five main tabs (Home, Models, Projects,
+Playground, Inference) to move between them, in addition to tapping the tab
+bar.
+
+## Settings
+
+- **Downloads** - Ask / Wi-Fi only / Allow mobile data, with a "remember my
+  choice" checkbox on the in-context prompt that writes back to this setting.
+- **Lite Mode** - caps the CPU threads used for generation to save
+  battery/heat, at the cost of speed; shows a one-time warning when enabled.
+- **Background running** - a one-tap shortcut to Android's "ignore battery
+  optimizations" dialog, so long downloads/inference are less likely to be
+  paused while the app is backgrounded.
 
 ## Design system
 

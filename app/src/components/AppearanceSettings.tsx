@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
+import { TextInput } from "./TextInput";
 import { Button } from "./Button";
 import { GradientSlider } from "./GradientSlider";
 import { ACCENT_PRESETS, ColorPalette, DEFAULT_ACCENT_PRESET, isValidHexColor, spacing } from "../theme/colors";
@@ -29,16 +31,21 @@ export function ThemeModeSection() {
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
   const darkContrast = useSettingsStore((s) => s.darkContrast);
   const setDarkContrast = useSettingsStore((s) => s.setDarkContrast);
+  const secretTheme = useSettingsStore((s) => s.secretTheme);
+  const setSecretTheme = useSettingsStore((s) => s.setSecretTheme);
 
   return (
     <>
       <View style={styles.themeRow}>
         {THEME_OPTIONS.map((opt) => {
-          const active = opt.mode === themeMode;
+          const active = secretTheme === "none" && opt.mode === themeMode;
           return (
             <Pressable
               key={opt.mode}
-              onPress={() => setThemeMode(opt.mode)}
+              onPress={() => {
+                setSecretTheme("none");
+                setThemeMode(opt.mode);
+              }}
               style={[styles.themeChip, active && styles.themeChipActive]}
             >
               <Text style={[styles.themeChipLabel, active && styles.themeChipLabelActive]}>{opt.label}</Text>
@@ -52,11 +59,14 @@ export function ThemeModeSection() {
           <Text style={styles.subLabel}>Dark contrast</Text>
           <View style={styles.themeRow}>
             {DARK_CONTRAST_OPTIONS.map((opt) => {
-              const active = opt.value === darkContrast;
+              const active = secretTheme === "none" && opt.value === darkContrast;
               return (
                 <Pressable
                   key={opt.value}
-                  onPress={() => setDarkContrast(opt.value)}
+                  onPress={() => {
+                    setSecretTheme("none");
+                    setDarkContrast(opt.value);
+                  }}
                   style={[styles.themeChip, active && styles.themeChipActive]}
                 >
                   <Text style={[styles.themeChipLabel, active && styles.themeChipLabelActive]}>{opt.label}</Text>
@@ -154,6 +164,8 @@ export function ColorPaletteSection() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const accentPreset = useSettingsStore((s) => s.accentPreset);
   const setAccentPreset = useSettingsStore((s) => s.setAccentPreset);
+  const secretTheme = useSettingsStore((s) => s.secretTheme);
+  const setSecretTheme = useSettingsStore((s) => s.setSecretTheme);
   const customPrimaryColor = useSettingsStore((s) => s.customPrimaryColor);
   const customSecondaryColor = useSettingsStore((s) => s.customSecondaryColor);
   const customTertiaryColor = useSettingsStore((s) => s.customTertiaryColor);
@@ -171,6 +183,7 @@ export function ColorPaletteSection() {
 
   const applyCustomColors = () => {
     if (!customInputsValid) return;
+    setSecretTheme("none");
     setCustomColors(primaryInput.trim(), secondaryInput.trim(), tertiaryInput.trim());
   };
 
@@ -192,12 +205,13 @@ export function ColorPaletteSection() {
       </Text>
       <View style={styles.swatchRow}>
         {ACCENT_PRESETS.map((preset) => {
-          const active = accentPreset === preset.name;
+          const active = secretTheme === "none" && accentPreset === preset.name;
           return (
             <Pressable
               key={preset.name}
               onPress={() => {
                 setShowCustomInputs(false);
+                setSecretTheme("none");
                 setAccentPreset(preset.name);
               }}
               style={styles.swatchTile}
@@ -225,9 +239,11 @@ export function ColorPaletteSection() {
                 <View style={[styles.ball, { backgroundColor: customTertiaryColor }]} />
                 <View style={[styles.ball, styles.ballOverlap, { backgroundColor: customSecondaryColor }]} />
                 <View style={[styles.ball, styles.ballOverlap, { backgroundColor: customPrimaryColor }]} />
-                <View style={styles.checkBadge}>
-                  <Text style={styles.checkBadgeLabel}>✓</Text>
-                </View>
+                {secretTheme === "none" ? (
+                  <View style={styles.checkBadge}>
+                    <Text style={styles.checkBadgeLabel}>✓</Text>
+                  </View>
+                ) : null}
               </>
             ) : (
               <View style={[styles.ball, styles.customBall]}>

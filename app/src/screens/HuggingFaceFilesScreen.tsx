@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
 import { Button } from "../components/Button";
 import { StatusBadge } from "../components/StatusBadge";
 import { ColorPalette, spacing } from "../theme/colors";
@@ -7,8 +8,11 @@ import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi, HfFileSummary } from "../api/huggingface";
 import { checkCompatibility, CompatibilityInfo } from "../utils/compatibility";
-import { downloadModel, isModelDownloaded, DownloadHandle } from "../services/modelStorage";
+import { downloadModel, isModelDownloaded } from "../services/modelStorage";
+import { canProceedWithDownload } from "../services/downloadPolicy";
 import { formatBytes } from "../utils/format";
+import { showAlert } from "../state/useAlertStore";
+import { reportDownloadProgress, stopTrackingDownload, useDownloadStore } from "../state/useDownloadStore";
 
 const CATEGORY_LABEL: Record<string, string> = {
   supported: "SUPPORTED",
@@ -22,10 +26,20 @@ interface FileRow extends HfFileSummary {
   downloaded: boolean;
 }
 
-interface ActiveDownload {
-  filename: string;
-  progress: number;
-  handle: DownloadHandle;
+/** Walks up to the root Tab.Navigator to check whether "Models" is the
+ * currently active tab — re-checked fresh at completion time (not render
+ * time), since the download can easily finish minutes after the user
+ * wandered off to another tab. */
+function isModelsTabActive(navigation: any): boolean {
+  let nav = navigation;
+  while (nav) {
+    const state = nav.getState?.();
+    if (state?.type === "tab") {
+      return state.routeNames[state.index] === "Models";
+    }
+    nav = nav.getParent?.();
+  }
+  return false;
 }
 
 export function HuggingFaceFilesScreen({ route, navigation }: any) {
@@ -34,7 +48,8 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [files, setFiles] = useState<FileRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [download, setDownload] = useState<ActiveDownload | null>(null);
+  const downloads = useDownloadStore((s) => s.downloads);
+  const activeDownload = Object.values(downloads).find((d) => d.status === "downloading");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,7 +64,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
       );
       setFiles(rows);
     } catch (err) {
-      Alert.alert("Could not load files", String(err));
+      showAlert("Could not load files", String(err));
     } finally {
       setLoading(false);
     }
@@ -59,30 +74,40 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
     load();
   }, [load]);
 
-  const startDownload = (file: FileRow) => {
+  const startDownload = async (file: FileRow) => {
+    if (!(await canProceedWithDownload(file.filename))) return;
+
     const handle = downloadModel(huggingfaceApi.downloadUrl(repoId, file.filename), file.filename, (fraction) => {
-      setDownload((prev) => (prev ? { ...prev, progress: fraction } : prev));
+      reportDownloadProgress(file.filename, fraction);
     });
-    setDownload({ filename: file.filename, progress: 0, handle });
+    useDownloadStore.getState().beginDownload(file.filename, handle.cancel);
 
     handle.done
       .then(async () => {
-        setDownload(null);
+        stopTrackingDownload(file.filename);
+        useDownloadStore.getState().clearDownload(file.filename);
         await load();
-        Alert.alert("Download complete", `${file.filename} is now available in Models.`, [
-          { text: "Go to Models", onPress: () => navigation.navigate("Models List") },
-          { text: "Stay here" },
-        ]);
+        showAlert(
+          "Download complete",
+          `${file.filename} is now available in Models.`,
+          isModelsTabActive(navigation)
+            ? [{ label: "OK" }]
+            : [
+                { label: "Go to Models", onPress: () => navigation.navigate("Models List") },
+                { label: "Stay here", variant: "neutral" },
+              ]
+        );
       })
       .catch((err) => {
-        setDownload(null);
-        Alert.alert("Download failed", String(err));
+        stopTrackingDownload(file.filename);
+        useDownloadStore.getState().setFailed(file.filename, String(err));
+        showAlert("Download failed", String(err));
       });
   };
 
   const confirmDownload = (file: FileRow) => {
-    if (download) {
-      Alert.alert("Download in progress", "Wait for the current download to finish first.");
+    if (activeDownload) {
+      showAlert("Download in progress", "Wait for the current download to finish first.");
       return;
     }
     const category = file.compatibility.category;
@@ -91,22 +116,22 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
       // Two-step confirmation for the risky tier: an initial warning, then a
       // second, harder confirmation spelling out concrete consequences -
       // proceeding past this point is an explicit, informed choice.
-      Alert.alert("This will likely crash from OOM", `${file.filename}\n\n${file.compatibility.message}`, [
-        { text: "Cancel", style: "cancel" },
-        { text: "Continue Anyway", style: "destructive", onPress: () => confirmRiskyDownloadFinal(file) },
+      showAlert("This will likely crash from OOM", `${file.filename}\n\n${file.compatibility.message}`, [
+        { label: "Cancel", variant: "neutral" },
+        { label: "Continue Anyway", variant: "danger", onPress: () => confirmRiskyDownloadFinal(file) },
       ]);
       return;
     }
 
     const title = category === "can_bottleneck" ? "This may bottleneck your device" : "Download this model?";
-    Alert.alert(title, `${file.filename}\n\n${file.compatibility.message}`, [
-      { text: "Cancel", style: "cancel" },
-      { text: "Download", onPress: () => startDownload(file) },
+    showAlert(title, `${file.filename}\n\n${file.compatibility.message}`, [
+      { label: "Cancel", variant: "neutral" },
+      { label: "Download", onPress: () => startDownload(file) },
     ]);
   };
 
   const confirmRiskyDownloadFinal = (file: FileRow) => {
-    Alert.alert(
+    showAlert(
       "Last chance - this is risky",
       "Running this model can cause:\n\n" +
         "- The app crashing or being killed by Android (out-of-memory)\n" +
@@ -115,30 +140,31 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
         "- In rare cases, needing to restart the phone\n\n" +
         "Your data won't be damaged, but the experience may be unusable. Proceed entirely at your own risk.",
       [
-        { text: "Cancel", style: "cancel" },
-        { text: "I Understand, Download", style: "destructive", onPress: () => startDownload(file) },
+        { label: "Cancel", variant: "neutral" },
+        { label: "I Understand, Download", variant: "danger", onPress: () => startDownload(file) },
       ]
     );
   };
 
   const cancelDownload = async () => {
-    if (!download) return;
-    await download.handle.cancel();
-    setDownload(null);
+    if (!activeDownload) return;
+    stopTrackingDownload(activeDownload.filename);
+    await activeDownload.cancel();
+    useDownloadStore.getState().clearDownload(activeDownload.filename);
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{repoId}</Text>
 
-      {download ? (
+      {activeDownload ? (
         <View style={styles.progressCard}>
-          <Text style={styles.progressLabel}>Downloading {download.filename}</Text>
+          <Text style={styles.progressLabel}>Downloading {activeDownload.filename}</Text>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${Math.min(100, download.progress * 100)}%` }]} />
+            <View style={[styles.progressFill, { width: `${Math.min(100, activeDownload.progress * 100)}%` }]} />
           </View>
           <View style={styles.progressRow}>
-            <Text style={styles.progressText}>{(download.progress * 100).toFixed(0)}%</Text>
+            <Text style={styles.progressText}>{(activeDownload.progress * 100).toFixed(0)}%</Text>
             <Button label="Cancel" variant="danger" onPress={cancelDownload} />
           </View>
         </View>

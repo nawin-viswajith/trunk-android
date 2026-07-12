@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet } from "react-native";
+import { Text } from "./Text";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 

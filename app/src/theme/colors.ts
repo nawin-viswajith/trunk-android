@@ -1,4 +1,4 @@
-// Flat, sharp-edged design system: no gradients, no border-radius. Every
+﻿// Flat, sharp-edged design system: no gradients, no border-radius. Every
 // surface is a solid flat fill or a 1px flat border. Same shape in light and
 // dark - only the palette values change.
 
@@ -45,7 +45,7 @@ export const darkBase: BasePalette = {
   warning: "#EAB308",
 };
 
-/** True OLED black -- an alternate dark contrast level, not a separate theme.
+/** True OLED black — an alternate dark contrast level, not a separate theme.
  * background is pure black for max contrast/OLED power savings, but surface
  * needs a slight lift above it (not also pure black) or every header/card/
  * modal that relies on surface-vs-background contrast becomes invisible. */
@@ -129,7 +129,7 @@ export const ACCENT_PRESETS: AccentPreset[] = [
     tertiary: { dark: "#818CF8", light: "#4F46E5" },
   },
   {
-    // No color, just a contrast ramp -- each tone is independently tuned per
+    // No color, just a contrast ramp — each tone is independently tuned per
     // mode (not just re-used across dark/light) so it actually reads as three
     // distinct steps against both a near-black and a white background.
     name: "Greyscale",
@@ -140,6 +140,63 @@ export const ACCENT_PRESETS: AccentPreset[] = [
 ];
 
 export const DEFAULT_ACCENT_PRESET = ACCENT_PRESETS[0].name;
+
+/** Hidden alternate palettes (see SettingsScreen.tsx's 7-tap easter egg on
+ * the app icon) — each is a complete, self-contained ColorPalette that
+ * replaces the normal light/dark + accent-preset resolution entirely rather
+ * than layering on top of it, so picking one looks the same regardless of
+ * whatever light/dark mode was previously selected. Kept deliberately dark
+ * and minimal (a single accent color pop, not a saturated wash) rather than
+ * a literal costume-color recreation. */
+export type SecretThemeId = "dreamPink" | "webSlinger" | "darkKnight";
+
+export const SECRET_THEMES: Record<SecretThemeId, ColorPalette & { label: string }> = {
+  dreamPink: {
+    label: "Dream Pink",
+    background: "#0D0A0D",
+    surface: "#1A1218",
+    surfaceAlt: "#241A22",
+    border: "#3D2A38",
+    textPrimary: "#FCEEF7",
+    textSecondary: "#C9A8BE",
+    running: "#22C55E",
+    error: "#EF4444",
+    warning: "#EAB308",
+    accent: "#DA1884",
+    accentSecondary: "#D4AF37",
+    accentTertiary: "#F5B8D8",
+  },
+  webSlinger: {
+    label: "Web Slinger",
+    background: "#0A0A0F",
+    surface: "#14141C",
+    surfaceAlt: "#1C1C28",
+    border: "#2A2A3D",
+    textPrimary: "#F0F1F8",
+    textSecondary: "#9A9DB8",
+    running: "#22C55E",
+    error: "#EF4444",
+    warning: "#EAB308",
+    accent: "#DF1F2D",
+    accentSecondary: "#2B3784",
+    accentTertiary: "#6B7FD9",
+  },
+  darkKnight: {
+    label: "Dark Knight",
+    background: "#000000",
+    surface: "#0A0A0A",
+    surfaceAlt: "#141414",
+    border: "#2C2C2C",
+    textPrimary: "#FFFFFF",
+    textSecondary: "#A0A0A0",
+    running: "#22C55E",
+    error: "#EF4444",
+    warning: "#EAB308",
+    accent: "#F2A900",
+    accentSecondary: "#515155",
+    accentTertiary: "#7F8086",
+  },
+};
 
 export function isValidHexColor(value: string): boolean {
   return /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.test(value.trim());

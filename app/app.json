@@ -18,7 +18,10 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.tuskerlabs.trunk"
+      "package": "com.tuskerlabs.trunk",
+      "permissions": [
+        "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,6 +43,15 @@
           "imageWidth": 220,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
+        }
+      ],
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
         }
       ]
     ]

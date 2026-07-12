@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useMemo } from "react";
 import { useColorScheme } from "react-native";
 import { useSettingsStore } from "../state/useSettingsStore";
-import { ACCENT_PRESETS, ColorPalette, darkBase, darkBasePitchBlack, lightBase } from "./colors";
+import { ACCENT_PRESETS, ColorPalette, darkBase, darkBasePitchBlack, lightBase, SECRET_THEMES } from "./colors";
 
 interface ThemeContextValue {
   scheme: "light" | "dark";
@@ -38,14 +38,31 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const customPrimaryColor = useSettingsStore((s) => s.customPrimaryColor);
   const customSecondaryColor = useSettingsStore((s) => s.customSecondaryColor);
   const customTertiaryColor = useSettingsStore((s) => s.customTertiaryColor);
+  const secretTheme = useSettingsStore((s) => s.secretTheme);
   const systemScheme = useColorScheme();
 
   const value = useMemo<ThemeContextValue>(() => {
     const scheme = themeMode === "system" ? (systemScheme === "light" ? "light" : "dark") : themeMode;
+    // A secret theme fully replaces the normal resolution below — it isn't
+    // an accent layered on top of light/dark, it's one fixed look regardless
+    // of what light/dark mode was previously selected.
+    if (secretTheme !== "none") {
+      const { label, ...colors } = SECRET_THEMES[secretTheme];
+      return { scheme, colors };
+    }
     const base = scheme === "light" ? lightBase : darkContrast === "pitchBlack" ? darkBasePitchBlack : darkBase;
     const accents = resolveAccents(accentPreset, customPrimaryColor, customSecondaryColor, customTertiaryColor, scheme);
     return { scheme, colors: { ...base, ...accents } };
-  }, [themeMode, darkContrast, accentPreset, customPrimaryColor, customSecondaryColor, customTertiaryColor, systemScheme]);
+  }, [
+    themeMode,
+    darkContrast,
+    accentPreset,
+    customPrimaryColor,
+    customSecondaryColor,
+    customTertiaryColor,
+    secretTheme,
+    systemScheme,
+  ]);
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

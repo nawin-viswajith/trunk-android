@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
 import { CheckIndicator } from "./CheckIndicator";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
@@ -13,26 +14,43 @@ interface ModelCardProps {
   onToggleSelect?: () => void;
   selectionMode?: boolean;
   selected?: boolean;
+  /** 0-1 fraction — while set, this row shows live download progress instead
+   * of its normal size/date metadata, and can't be opened or selected: the
+   * file on disk is still partial. */
+  downloadProgress?: number;
 }
 
-export function ModelCard({ model, onPress, onLongPress, onToggleSelect, selectionMode, selected }: ModelCardProps) {
+export function ModelCard({
+  model,
+  onPress,
+  onLongPress,
+  onToggleSelect,
+  selectionMode,
+  selected,
+  downloadProgress,
+}: ModelCardProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const downloading = downloadProgress !== undefined;
   return (
     <Pressable
-      onPress={selectionMode ? onToggleSelect : onPress}
-      onLongPress={onLongPress}
-      style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && styles.cardPressed]}
+      onPress={downloading ? undefined : selectionMode ? onToggleSelect : onPress}
+      onLongPress={downloading ? undefined : onLongPress}
+      style={({ pressed }) => [styles.card, selected && styles.cardSelected, pressed && !downloading && styles.cardPressed]}
     >
       <View style={styles.textWrap}>
         <Text style={styles.name} numberOfLines={1}>
           {model.filename}
         </Text>
-        <Text style={styles.meta}>
-          {[model.quant, formatBytes(model.sizeBytes), formatDate(model.addedAt)].filter(Boolean).join(" · ")}
-        </Text>
+        {downloading ? (
+          <Text style={styles.downloadingMeta}>Downloading… {(downloadProgress * 100).toFixed(0)}%</Text>
+        ) : (
+          <Text style={styles.meta}>
+            {[model.quant, formatBytes(model.sizeBytes), formatDate(model.addedAt)].filter(Boolean).join(" · ")}
+          </Text>
+        )}
       </View>
-      {selectionMode ? <CheckIndicator checked={!!selected} /> : null}
+      {!downloading && selectionMode ? <CheckIndicator checked={!!selected} /> : null}
     </Pressable>
   );
 }
@@ -65,6 +83,12 @@ function createStyles(colors: ColorPalette) {
       color: colors.textSecondary,
       fontSize: 12,
       fontFamily: "monospace",
+    },
+    downloadingMeta: {
+      color: colors.running,
+      fontSize: 12,
+      fontFamily: "monospace",
+      fontWeight: "600",
     },
     trashButton: { padding: spacing.xs },
     trashButtonPressed: { opacity: 0.6 },

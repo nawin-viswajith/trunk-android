@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BackHandler, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
+import { TextInput } from "../components/TextInput";
 import { useFocusEffect } from "@react-navigation/native";
 import { Button } from "../components/Button";
 import { Card } from "../components/Card";
@@ -8,6 +10,7 @@ import { ConfirmModal } from "../components/ConfirmModal";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
+import { showAlert } from "../state/useAlertStore";
 import { useProjectStore, selectProject, selectHistoryForProject, selectSessionsForProject } from "../state/useProjectStore";
 import { listLocalModels, LocalModel, modelPath, isModelDownloaded } from "../services/modelStorage";
 import { benchmarkModel } from "../services/llamaEngine";
@@ -102,7 +105,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
     const cl = parseInt(contextLength, 10);
     const mt = parseInt(maxTokens, 10);
     if ([t, tp, tk, cl, mt].some((v) => Number.isNaN(v))) {
-      Alert.alert("Invalid values", "Enter valid numbers for all parameters.");
+      showAlert("Invalid values", "Enter valid numbers for all parameters.");
       return;
     }
     updateProject(projectId, { temperature: t, topP: tp, topK: tk, contextLength: cl, maxTokens: mt });
@@ -116,19 +119,19 @@ export function ProjectDetailScreen({ route, navigation }: any) {
   const runBenchmark = async () => {
     if (!project?.modelFilename) return;
     if (!(await isModelDownloaded(project.modelFilename))) {
-      Alert.alert("Model not found", "This project's model is no longer downloaded.");
+      showAlert("Model not found", "This project's model is no longer downloaded.");
       return;
     }
     setBenchmarking(true);
     try {
       const result = await benchmarkModel(modelPath(project.modelFilename), project.contextLength);
-      Alert.alert(
+      showAlert(
         "Benchmark passed",
         `Model loaded and generated text successfully.\n\nLoad time: ${(result.loadTimeMs / 1000).toFixed(1)}s\n` +
           `${result.tokens} tokens @ ${result.tokensPerSecond.toFixed(1)} tok/s`
       );
     } catch (err) {
-      Alert.alert("Benchmark failed", `The model failed to load or generate:\n\n${String(err)}`);
+      showAlert("Benchmark failed", `The model failed to load or generate:\n\n${String(err)}`);
     } finally {
       setBenchmarking(false);
     }
@@ -218,6 +221,12 @@ export function ProjectDetailScreen({ route, navigation }: any) {
           </View>
         ))}
         {history.length === 0 ? <Text style={styles.value}>No inference runs yet.</Text> : null}
+      </Card>
+
+      <Card>
+        <Text style={styles.sectionTitle}>Playground</Text>
+        <Text style={styles.value}>Wire this project's ideas into a multi-agent flow.</Text>
+        <Button label="Open Playground" onPress={() => navigation.navigate("Playground")} variant="secondary" />
       </Card>
 
       <Button label="Delete Project" onPress={() => setDeleteConfirmOpen(true)} variant="danger" />

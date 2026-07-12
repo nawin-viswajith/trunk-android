@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+﻿import React, { useEffect, useMemo, useState } from "react";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { Text } from "../components/Text";
+import { TextInput } from "../components/TextInput";
 import { Button } from "../components/Button";
 import { IndeterminateProgressBar } from "../components/IndeterminateProgressBar";
 import { spacing, ColorPalette } from "../theme/colors";
@@ -7,6 +9,7 @@ import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi } from "../api/huggingface";
 import { HfModelSummary } from "../api/types";
+import { showAlert } from "../state/useAlertStore";
 
 export function HuggingFaceSearchScreen({ navigation }: any) {
   const colors = useColors();
@@ -17,7 +20,7 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
   const [searched, setSearched] = useState(false);
   const [loadingPopular, setLoadingPopular] = useState(true);
 
-  // No hardcoded starter list -- pull real trending GGUF repos (sorted by
+  // No hardcoded starter list — pull real trending GGUF repos (sorted by
   // downloads, no search term) from the same endpoint a search hits.
   useEffect(() => {
     huggingfaceApi
@@ -34,7 +37,7 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
       setResults(await huggingfaceApi.search(query.trim()));
       setSearched(true);
     } catch (err) {
-      Alert.alert("Search failed", String(err));
+      showAlert("Search failed", String(err));
     } finally {
       setSearching(false);
     }

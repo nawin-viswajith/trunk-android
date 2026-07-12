@@ -1,6 +1,3 @@
-// Copyright © 2026 TuskerLabs. All rights reserved.
-// Unauthorized copying of this file, via any medium, is strictly prohibited.
-
 import * as FileSystem from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
 import { quantFromFilename } from "../utils/quant";
@@ -74,6 +71,13 @@ export function downloadModel(url: string, filename: string, onProgress: (fracti
     .then((result) => {
       if (cancelled) throw new Error("cancelled");
       if (!result || result.status !== 200) throw new Error(`download failed: HTTP ${result?.status}`);
+    })
+    .catch(async (err) => {
+      // Whatever partial bytes were written must not linger — createDownloadResumable
+      // writes straight to the final destination, so a leftover partial file would
+      // otherwise look exactly like a complete, valid model to listLocalModels().
+      await FileSystem.deleteAsync(destination, { idempotent: true });
+      throw err;
     });
 
   return {

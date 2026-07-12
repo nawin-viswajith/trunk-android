@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Text } from "./Text";
+import { TextInput } from "./TextInput";
 import { Button } from "./Button";
 import { CheckIndicator } from "./CheckIndicator";
 import { ColorPalette, spacing } from "../theme/colors";
