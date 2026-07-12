@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { AgentCard } from "../../components/flow/AgentCard";
@@ -9,7 +9,7 @@ import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
 
-export function AgentLibraryScreen({ navigation }: any) {
+export function AgentLibraryScreen({ navigation, route }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const agents = useFlowStore((s) => s.agents);
@@ -46,6 +46,14 @@ export function AgentLibraryScreen({ navigation }: any) {
     setEditingId(null);
     setEditorOpen(true);
   };
+
+  useEffect(() => {
+    if (route?.params?.openCreate) {
+      openCreate();
+      navigation.setParams({ openCreate: undefined });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.openCreate]);
 
   const openEdit = (id: string) => {
     setEditingId(id);

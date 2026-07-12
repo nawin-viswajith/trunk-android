@@ -155,6 +155,16 @@ export function FlowListScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={() => {
                 setFabMenuOpen(false);
+                navigation.navigate("Agent Library", { openCreate: true });
+              }}
+            >
+              <Text style={styles.menuItemLabel}>Create Agent</Text>
+            </Pressable>
+            <View style={styles.menuDivider} />
+            <Pressable
+              style={styles.menuItem}
+              onPress={() => {
+                setFabMenuOpen(false);
                 navigation.navigate("Agent Library");
               }}
             >
