@@ -2,6 +2,8 @@
 backend/.venv/
 backend/__pycache__/
 backend/**/__pycache__/
+backend/.pytest_cache/
+backend/**/.pytest_cache/
 backend/*.db
 backend/logs/*.log
 backend/workspace/models/*.gguf
@@ -13,9 +15,14 @@ app/node_modules/
 app/.expo/
 app/dist/
 app/web-build/
+app/ios/
+app/android/
 app/*.log
 app/.env*
 !app/.env.example
+
+# Claude Code (project-local, machine-specific)
+**/.claude/settings.local.json
 
 # Editor/OS
 .vscode/
