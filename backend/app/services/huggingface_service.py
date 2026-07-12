@@ -27,8 +27,8 @@ async def list_gguf_files(repo_id: str) -> list[HfGgufFile]:
     """Lists single-file GGUF variants for a repo (filtering out split shards
     like `-00001-of-00002.gguf`, which would need multi-part download/merge
     support the app doesn't have). Compatibility with the requesting phone's
-    RAM is computed client-side now -- this backend has no device to check
-    against."""
+    RAM is computed client-side now, since this backend has no device to
+    check against."""
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(f"{HF_API_BASE}/models/{repo_id}/tree/main")
         resp.raise_for_status()
