@@ -10,6 +10,8 @@ import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi } from "../api/huggingface";
 import { HfModelSummary } from "../api/types";
 import { showAlert } from "../state/useAlertStore";
+import { useBackendHealth } from "../services/backendHealth";
+import { BackendStatusBanner } from "../components/BackendStatusBanner";
 
 export function HuggingFaceSearchScreen({ navigation }: any) {
   const colors = useColors();
@@ -19,6 +21,7 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
   const [loadingPopular, setLoadingPopular] = useState(true);
+  const { status: backendStatus, retry: retryBackend } = useBackendHealth();
 
   // No hardcoded starter list — pull real trending GGUF repos (sorted by
   // downloads, no search term) from the same endpoint a search hits.
@@ -48,6 +51,7 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <Text style={styles.subtitle}>Search for GGUF models. Compatibility with your connected device is checked before download.</Text>
+      <BackendStatusBanner status={backendStatus} onRetry={retryBackend} />
       <View style={styles.searchRow}>
         <TextInput
           value={query}
