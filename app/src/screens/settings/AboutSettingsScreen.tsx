@@ -70,6 +70,18 @@ export function AboutSettingsScreen() {
         <Text style={styles.licenseTileCaret}>›</Text>
       </Pressable>
 
+      {/* TODO (see ROADMAP.md): a "Developer" tile — contact/GitHub/feedback
+          link for the person(s) behind Trunk. Not wired up yet, commented
+          out until there's real content to show here.
+      <Pressable
+        onPress={() => {}}
+        style={({ pressed }) => [styles.licenseTile, pressed && styles.licenseTilePressed]}
+      >
+        <Text style={styles.licenseTileLabel}>Developer</Text>
+        <Text style={styles.licenseTileCaret}>›</Text>
+      </Pressable>
+      */}
+
       <Modal visible={licenseVisible} transparent animationType="fade" onRequestClose={() => setLicenseVisible(false)}>
         <Pressable style={styles.backdrop} onPress={() => setLicenseVisible(false)}>
           <Pressable style={styles.modalCard} onPress={() => {}}>
