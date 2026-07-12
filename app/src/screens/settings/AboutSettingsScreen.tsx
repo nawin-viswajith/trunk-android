@@ -17,6 +17,7 @@ export function AboutSettingsScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const secretThemesUnlocked = useSettingsStore((s) => s.secretThemesUnlocked);
   const unlockSecretThemes = useSettingsStore((s) => s.unlockSecretThemes);
+  const backendUrl = useSettingsStore((s) => s.backendUrl);
   const [licenseVisible, setLicenseVisible] = useState(false);
 
   const tapCountRef = useRef(0);
@@ -54,6 +55,11 @@ export function AboutSettingsScreen() {
         <Text style={styles.shortDescription}>
           Chat with GGUF models, bind them to Projects, or chain reusable Agents into Flows, fully offline.
         </Text>
+        {secretThemesUnlocked ? (
+          <Text style={styles.debugLine} selectable>
+            Backend: {backendUrl}
+          </Text>
+        ) : null}
       </Card>
 
       <Pressable
@@ -112,6 +118,7 @@ function createStyles(colors: ColorPalette) {
     tagline: { color: colors.textPrimary, fontSize: 14, fontWeight: "700" },
     identity: { color: colors.textSecondary, fontSize: 11 },
     shortDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, textAlign: "justify" },
+    debugLine: { color: colors.textSecondary, fontSize: 10, fontFamily: "monospace", marginTop: spacing.sm },
     licenseTile: {
       flexDirection: "row",
       alignItems: "center",

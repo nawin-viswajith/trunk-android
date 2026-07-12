@@ -58,7 +58,7 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
-      backendUrl: "http://localhost:8000",
+      backendUrl: "https://trunk-backend-dev.onrender.com",
       themeMode: "system", // follow the OS preference until the user picks explicitly
       darkContrast: "standard",
       accentPreset: DEFAULT_ACCENT_PRESET,
