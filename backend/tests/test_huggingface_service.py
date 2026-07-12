@@ -61,7 +61,7 @@ async def test_list_gguf_files_filters_split_shards_and_non_gguf(monkeypatch):
 @pytest.mark.asyncio
 async def test_search_models_against_real_hf_api():
     """Lightweight integration check against the real API to catch shape
-    drift -- skips gracefully if this environment has no network access."""
+    drift, skipping gracefully if this environment has no network access."""
     try:
         results = await huggingface_service.search_models("qwen2.5-coder", limit=3)
     except httpx.HTTPError:
