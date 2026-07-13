@@ -165,6 +165,10 @@ export function InferenceScreen({ route, navigation }: any) {
     });
   }, [activeProject, navigation]);
 
+  const goToProjectsList = useCallback(() => {
+    navigation.navigate("Projects");
+  }, [navigation]);
+
   const messages = useMemo<ChatMessage[]>(() => {
     if (!activeSessionId) return [];
     const entries = selectHistoryForSession(history, activeSessionId).slice().reverse();
@@ -369,7 +373,12 @@ export function InferenceScreen({ route, navigation }: any) {
         onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
         ListEmptyComponent={
           !activeProject ? (
-            <Text style={styles.empty}>No project selected - create one in the Projects tab.</Text>
+            <View style={styles.emptyState}>
+              <Text style={styles.empty}>No project selected yet.</Text>
+              <Pressable onPress={goToProjectsList}>
+                <Text style={styles.emptyLink}>Create one in Projects ›</Text>
+              </Pressable>
+            </View>
           ) : !activeProject.modelFilename ? (
             <View style={styles.emptyState}>
               <Text style={styles.empty}>This project has no model assigned yet.</Text>

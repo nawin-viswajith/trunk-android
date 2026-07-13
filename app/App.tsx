@@ -26,6 +26,14 @@ function AppInner() {
   const batteryPromptShown = useRef(false);
 
   useEffect(() => {
+    // Fire-and-forget: Render's free tier spins the backend down after idle,
+    // so ping it the moment the app opens rather than waiting for the user
+    // to reach Hugging Face search — the ~30-50s cold start then happens
+    // quietly in the background while they're still on Home/onboarding.
+    fetch(`${useSettingsStore.getState().backendUrl}/api/health`).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
     // A fresh random minimum each launch (1.5-2.5s) so the splash doesn't
     // feel identical every time — but real store rehydration always wins

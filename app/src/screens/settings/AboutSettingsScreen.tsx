@@ -17,6 +17,7 @@ export function AboutSettingsScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const secretThemesUnlocked = useSettingsStore((s) => s.secretThemesUnlocked);
   const unlockSecretThemes = useSettingsStore((s) => s.unlockSecretThemes);
+  const backendUrl = useSettingsStore((s) => s.backendUrl);
   const [licenseVisible, setLicenseVisible] = useState(false);
 
   const tapCountRef = useRef(0);
@@ -48,12 +49,17 @@ export function AboutSettingsScreen() {
           </Pressable>
           <View style={styles.heroTextWrap}>
             <Text style={styles.tagline}>Local inference engine for LLMs on your phone.</Text>
-            <Text style={styles.identity}>TuskerLabs · MIT License</Text>
+            <Text style={styles.identity}>© 2026 TuskerLabs · MIT License</Text>
           </View>
         </View>
         <Text style={styles.shortDescription}>
           Chat with GGUF models, bind them to Projects, or chain reusable Agents into Flows, fully offline.
         </Text>
+        {secretThemesUnlocked ? (
+          <Text style={styles.debugLine} selectable>
+            Backend: {backendUrl}
+          </Text>
+        ) : null}
       </Card>
 
       <Pressable
@@ -63,6 +69,18 @@ export function AboutSettingsScreen() {
         <Text style={styles.licenseTileLabel}>License</Text>
         <Text style={styles.licenseTileCaret}>›</Text>
       </Pressable>
+
+      {/* TODO (see ROADMAP.md): a "Developer" tile — contact/GitHub/feedback
+          link for the person(s) behind Trunk. Not wired up yet, commented
+          out until there's real content to show here.
+      <Pressable
+        onPress={() => {}}
+        style={({ pressed }) => [styles.licenseTile, pressed && styles.licenseTilePressed]}
+      >
+        <Text style={styles.licenseTileLabel}>Developer</Text>
+        <Text style={styles.licenseTileCaret}>›</Text>
+      </Pressable>
+      */}
 
       <Modal visible={licenseVisible} transparent animationType="fade" onRequestClose={() => setLicenseVisible(false)}>
         <Pressable style={styles.backdrop} onPress={() => setLicenseVisible(false)}>
@@ -81,7 +99,9 @@ export function AboutSettingsScreen() {
   );
 }
 
-const MIT_LICENSE_TEXT = `Permission is hereby granted, free of charge, to any person obtaining a copy
+const MIT_LICENSE_TEXT = `Copyright (c) 2026 TuskerLabs
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
@@ -110,6 +130,7 @@ function createStyles(colors: ColorPalette) {
     tagline: { color: colors.textPrimary, fontSize: 14, fontWeight: "700" },
     identity: { color: colors.textSecondary, fontSize: 11 },
     shortDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, textAlign: "justify" },
+    debugLine: { color: colors.textSecondary, fontSize: 10, fontFamily: "monospace", marginTop: spacing.sm },
     licenseTile: {
       flexDirection: "row",
       alignItems: "center",

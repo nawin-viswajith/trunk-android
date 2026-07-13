@@ -13,6 +13,8 @@ import { canProceedWithDownload } from "../services/downloadPolicy";
 import { formatBytes } from "../utils/format";
 import { showAlert } from "../state/useAlertStore";
 import { reportDownloadProgress, stopTrackingDownload, useDownloadStore } from "../state/useDownloadStore";
+import { useBackendHealth } from "../services/backendHealth";
+import { BackendStatusBanner } from "../components/BackendStatusBanner";
 
 const CATEGORY_LABEL: Record<string, string> = {
   supported: "SUPPORTED",
@@ -50,6 +52,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const downloads = useDownloadStore((s) => s.downloads);
   const activeDownload = Object.values(downloads).find((d) => d.status === "downloading");
+  const { status: backendStatus, retry: retryBackend } = useBackendHealth();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,6 +159,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{repoId}</Text>
+      <BackendStatusBanner status={backendStatus} onRetry={retryBackend} />
 
       {activeDownload ? (
         <View style={styles.progressCard}>
