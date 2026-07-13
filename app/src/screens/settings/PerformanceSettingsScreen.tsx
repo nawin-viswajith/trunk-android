@@ -9,6 +9,7 @@ import { useColors } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { showAlert } from "../../state/useAlertStore";
 import { isBatteryOptimizationExempt, requestBatteryOptimizationExemption } from "../../services/batteryOptimization";
+import { detectNpuDevices } from "../../services/llamaEngine";
 import { createScreenStyles } from "../../theme/layout";
 
 export function PerformanceSettingsScreen() {
@@ -17,15 +18,21 @@ export function PerformanceSettingsScreen() {
 
   const liteMode = useSettingsStore((s) => s.liteMode);
   const setLiteMode = useSettingsStore((s) => s.setLiteMode);
+  const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
+  const setNpuAcceleration = useSettingsStore((s) => s.setNpuAcceleration);
   // null while unknown (not yet checked this focus) — the card renders
   // nothing until resolved, rather than flashing then disappearing.
   const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null);
+  const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       isBatteryOptimizationExempt().then((exempt) => {
         if (!cancelled) setBatteryExempt(exempt);
+      });
+      detectNpuDevices().then((devices) => {
+        if (!cancelled) setNpuDevices(devices);
       });
       return () => {
         cancelled = true;
@@ -44,6 +51,17 @@ export function PerformanceSettingsScreen() {
     }
   };
 
+  const onToggleNpuAcceleration = (value: boolean) => {
+    setNpuAcceleration(value);
+    if (value) {
+      showAlert(
+        "NPU Acceleration enabled",
+        "Experimental. Only tested on Qualcomm Snapdragon 8 Gen 1 and newer, and best suited to models under 4B parameters. Takes effect the next time a model loads, and silently falls back to CPU on unsupported hardware.",
+        [{ label: "OK" }]
+      );
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Card>
@@ -56,6 +74,33 @@ export function PerformanceSettingsScreen() {
           <Switch
             value={liteMode}
             onValueChange={onToggleLiteMode}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.textPrimary}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <Text style={styles.sectionTitle}>NPU Acceleration</Text>
+        <Text style={styles.hint}>
+          Experimental. Offloads inference to the Hexagon NPU on supported Qualcomm chipsets (Snapdragon 8 Gen 1 and
+          newer) instead of the CPU.
+        </Text>
+        {npuDevices !== null ? (
+          <View style={styles.statusRow}>
+            <Text style={styles.statusLabel}>Hexagon NPU</Text>
+            <Text style={[styles.statusValue, npuDevices.length > 0 ? styles.statusValueGood : styles.statusValueBad]}>
+              {npuDevices.length > 0 ? `Detected (${npuDevices.join(", ")})` : "Not detected on this device"}
+            </Text>
+          </View>
+        ) : null}
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextWrap}>
+            <Text style={styles.toggleLabel}>Use NPU when available</Text>
+          </View>
+          <Switch
+            value={npuAcceleration}
+            onValueChange={onToggleNpuAcceleration}
             trackColor={{ false: colors.border, true: colors.accent }}
             thumbColor={colors.textPrimary}
           />

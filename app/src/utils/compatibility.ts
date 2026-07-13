@@ -113,9 +113,9 @@ export async function checkCompatibility(fileSizeBytes: number): Promise<Compati
 
   const category = categorize(requiredMb, memory.availableMb);
   const messages: Record<Exclude<CompatibilityCategory, "unknown">, string> = {
-    supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB available - comfortable fit.`,
-    can_bottleneck: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB available - will likely run but expect slowdowns or other apps getting closed.`,
-    not_supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, only ${memory.availableMb.toFixed(0)} MB available - likely to crash from out-of-memory.`,
+    supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB RAM available - comfortable fit.`,
+    can_bottleneck: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB RAM available - will likely run but expect slowdowns or other apps getting closed.`,
+    not_supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, only ${memory.availableMb.toFixed(0)} MB RAM available - likely to crash from out-of-memory.`,
   };
 
   return {

@@ -1,4 +1,5 @@
-﻿import { initLlama, LlamaContext } from "llama.rn";
+﻿import { Platform } from "react-native";
+import { initLlama, LlamaContext, getBackendDevicesInfo } from "llama.rn";
 import { useSettingsStore } from "../state/useSettingsStore";
 
 export interface EngineParams {
@@ -11,6 +12,52 @@ export interface EngineParams {
  * device's core count, since the point is a predictable low-CPU floor rather
  * than "half of whatever this phone has." */
 const LITE_MODE_THREADS = 2;
+
+// llama.cpp's own convention for "offload every layer" — used only once NPU
+// acceleration is actually enabled and detected; otherwise nGpuLayers stays
+// at its existing default of 0 (CPU-only), unchanged from before this offload
+// path existed.
+const NPU_ALL_LAYERS = 99;
+
+let cachedNpuDevices: string[] | null = null;
+
+/** Queries llama.rn's backend device list once per process (the set of
+ * available devices doesn't change while the app is running) and returns
+ * just the Hexagon HTP device names, if any — see llama.rn's Hexagon/HTP
+ * section: Qualcomm SM8450+ (Snapdragon 8 Gen 1+) devices only, experimental. */
+export async function detectNpuDevices(): Promise<string[]> {
+  if (cachedNpuDevices) return cachedNpuDevices;
+  if (Platform.OS !== "android") {
+    cachedNpuDevices = [];
+    return cachedNpuDevices;
+  }
+  try {
+    const devices = await getBackendDevicesInfo();
+    cachedNpuDevices = devices.filter((d) => d.deviceName.startsWith("HTP")).map((d) => d.deviceName);
+  } catch {
+    cachedNpuDevices = [];
+  }
+  return cachedNpuDevices;
+}
+
+export interface ActiveDeviceInfo {
+  /** Whether llama.cpp actually engaged an offload device (HTP/GPU) for the
+   * currently-loaded context — can be false even with NPU acceleration
+   * turned on, if this device wasn't one of the tested/supported chipsets. */
+  gpu: boolean;
+  devices: string[];
+  /** Set by llama.rn when gpu is false, explaining why offload didn't happen. */
+  reasonNoGPU: string;
+}
+
+let activeDeviceInfo: ActiveDeviceInfo | null = null;
+
+/** Runtime feedback for whichever context is currently loaded — null if
+ * nothing is loaded yet. Distinct from detectNpuDevices(), which only says
+ * a device exists, not whether the active context is actually using it. */
+export function getActiveDeviceInfo(): ActiveDeviceInfo | null {
+  return activeDeviceInfo;
+}
 
 export interface CompletionParams {
   messages: { role: "system" | "user" | "assistant"; content: string }[];
@@ -41,6 +88,7 @@ let activeContext: LlamaContext | null = null;
 let activeModelPath: string | null = null;
 let activeThreads: number | undefined;
 let activeContextLength: number | undefined;
+let activeNpuRequested: boolean | undefined;
 
 // The native context is a single shared singleton, but callers (Inference
 // chat, Flow runs, Craft-with-AI, benchmarking) live on screens that all
@@ -62,16 +110,21 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
 export async function ensureLoaded(modelPath: string, params: EngineParams): Promise<void> {
   return withLock(async () => {
     const effectiveThreads = params.threads ?? (useSettingsStore.getState().liteMode ? LITE_MODE_THREADS : undefined);
-    // Thread count and context length are both fixed at load time by
-    // initLlama — toggling Lite Mode, or changing a project/flow's context
-    // length, while this exact model is already loaded must force a reload,
-    // or the change would silently never take effect until a different
-    // model was picked.
+    const npuRequested = useSettingsStore.getState().npuAcceleration;
+    const npuDevices = npuRequested ? await detectNpuDevices() : [];
+    const npuActive = npuDevices.length > 0;
+
+    // Thread count, context length, and NPU offload are all fixed at load
+    // time by initLlama — toggling Lite Mode or NPU Acceleration, or
+    // changing a project/flow's context length, while this exact model is
+    // already loaded must force a reload, or the change would silently
+    // never take effect until a different model was picked.
     if (
       activeModelPath === modelPath &&
       activeContext &&
       activeThreads === effectiveThreads &&
-      activeContextLength === params.contextLength
+      activeContextLength === params.contextLength &&
+      activeNpuRequested === npuRequested
     ) {
       return;
     }
@@ -86,11 +139,18 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
       model: modelPath,
       n_ctx: params.contextLength,
       n_threads: effectiveThreads,
-      n_gpu_layers: params.nGpuLayers ?? 0,
+      n_gpu_layers: params.nGpuLayers ?? (npuActive ? NPU_ALL_LAYERS : 0),
+      ...(npuActive ? { devices: ["HTP*"] } : {}),
     });
     activeModelPath = modelPath;
     activeThreads = effectiveThreads;
     activeContextLength = params.contextLength;
+    activeNpuRequested = npuRequested;
+    activeDeviceInfo = {
+      gpu: activeContext.gpu,
+      devices: activeContext.devices ?? [],
+      reasonNoGPU: activeContext.reasonNoGPU ?? "",
+    };
   });
 }
 
@@ -101,6 +161,8 @@ export async function releaseEngine(): Promise<void> {
       activeContext = null;
       activeModelPath = null;
       activeContextLength = undefined;
+      activeNpuRequested = undefined;
+      activeDeviceInfo = null;
     }
   });
 }

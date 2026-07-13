@@ -33,6 +33,11 @@ interface SettingsState {
   /** Cuts the llama.cpp thread count to save battery/heat at the cost of
    * generation speed — see LITE_MODE_THREADS in llamaEngine.ts. */
   liteMode: boolean;
+  /** Offloads inference to the Hexagon NPU (HTP) when llama.rn detects one -
+   * experimental, and only tested on Qualcomm SM8450+ (Snapdragon 8 Gen 1+).
+   * Silently has no effect on unsupported hardware; see detectNpuDevices in
+   * llamaEngine.ts. Defaults off since it's unverified on most devices. */
+  npuAcceleration: boolean;
   /** true = Urbanist (see theme/fonts.ts), false = platform default system font. */
   useCustomFont: boolean;
   /** Once true, the hidden theme picker stays visible in Settings forever —
@@ -50,6 +55,7 @@ interface SettingsState {
   setHasOnboarded: (value: boolean) => void;
   setMobileDataDownloads: (pref: MobileDataDownloadPref) => void;
   setLiteMode: (value: boolean) => void;
+  setNpuAcceleration: (value: boolean) => void;
   setUseCustomFont: (value: boolean) => void;
   unlockSecretThemes: () => void;
   setSecretTheme: (theme: SecretThemeId | "none") => void;
@@ -69,6 +75,7 @@ export const useSettingsStore = create<SettingsState>()(
       hasOnboarded: false,
       mobileDataDownloads: "ask",
       liteMode: false,
+      npuAcceleration: false,
       useCustomFont: true,
       secretThemesUnlocked: false,
       secretTheme: "none",
@@ -87,6 +94,7 @@ export const useSettingsStore = create<SettingsState>()(
       setHasOnboarded: (value) => set({ hasOnboarded: value }),
       setMobileDataDownloads: (pref) => set({ mobileDataDownloads: pref }),
       setLiteMode: (value) => set({ liteMode: value }),
+      setNpuAcceleration: (value) => set({ npuAcceleration: value }),
       setUseCustomFont: (value) => set({ useCustomFont: value }),
       unlockSecretThemes: () => set({ secretThemesUnlocked: true }),
       setSecretTheme: (theme) => set({ secretTheme: theme }),
