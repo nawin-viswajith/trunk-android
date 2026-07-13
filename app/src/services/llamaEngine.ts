@@ -178,6 +178,29 @@ export function getActiveModelPath(): string | null {
   return activeContext ? activeModelPath : null;
 }
 
+/** The n_ctx the currently-loaded context was actually opened with — lets a
+ * screen compute "how full is the context window" without re-threading the
+ * project/flow's configured value through separately (and staying correct
+ * if ensureLoaded ever changes it, e.g. on a Lite Mode/NPU-triggered reload). */
+export function getActiveContextLength(): number | undefined {
+  return activeContext ? activeContextLength : undefined;
+}
+
+/** Tokenizes arbitrary text with the currently-loaded model's own tokenizer -
+ * used to estimate how much of the context window a prompt will consume
+ * before actually sending it, rather than only finding out from a completion
+ * result (or a native context-overflow error) after the fact. Returns 0 if
+ * nothing is loaded yet. */
+export async function countTokens(text: string): Promise<number> {
+  if (!activeContext || !text) return 0;
+  try {
+    const result = await activeContext.tokenize(text);
+    return result.tokens.length;
+  } catch {
+    return 0;
+  }
+}
+
 export interface BenchmarkResult {
   loadTimeMs: number;
   tokens: number;

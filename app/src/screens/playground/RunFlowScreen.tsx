@@ -6,8 +6,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../components/Button";
 import { MarkdownText } from "../../components/MarkdownText";
 import { TypingDots } from "../../components/TypingDots";
+import { ContextWindowMeter } from "../../components/ContextWindowMeter";
+import { AttachmentChip } from "../../components/AttachmentChip";
 import { runFlow, FlowProgress, FlowStepResult } from "../../services/flowRunner";
 import { selectFlow, useFlowStore } from "../../state/useFlowStore";
+import { ensureLoaded, countTokens } from "../../services/llamaEngine";
+import { modelPath } from "../../services/modelStorage";
+import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../../services/fileAttachment";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
@@ -28,6 +33,9 @@ export function RunFlowScreen({ route, navigation }: any) {
   const [finalResult, setFinalResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
   const listRef = useRef<FlatList<FlowStepResult>>(null);
 
   useEffect(() => {
@@ -44,20 +52,60 @@ export function RunFlowScreen({ route, navigation }: any) {
     };
   }, []);
 
+  // Preload so the input's live token estimate (which needs a tokenizer)
+  // is available while composing, not only once Run is actually pressed -
+  // a cheap no-op via ensureLoaded's singleton reuse if already loaded.
+  useEffect(() => {
+    if (flow?.modelFilename) {
+      ensureLoaded(modelPath(flow.modelFilename), { contextLength: flow.contextLength }).catch(() => {});
+    }
+  }, [flow?.modelFilename, flow?.contextLength]);
+
+  useEffect(() => {
+    const attachmentText = attachment ? formatAttachmentForPrompt(attachment) + "\n\n" : "";
+    const candidateText = attachmentText + input;
+    if (!candidateText.trim()) {
+      setLiveTokenEstimate(0);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      countTokens(candidateText).then((count) => {
+        if (!cancelled) setLiveTokenEstimate(count);
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [input, attachment]);
+
+  const onPickAttachment = async () => {
+    setAttachError(null);
+    try {
+      const picked = await pickTextAttachment();
+      if (picked) setAttachment(picked);
+    } catch (err) {
+      setAttachError(String(err instanceof Error ? err.message : err));
+    }
+  };
+
   if (!flow) return null;
 
   const run = async () => {
     if (!input.trim() || running) return;
+    const initialInput = attachment ? `${formatAttachmentForPrompt(attachment)}\n\n${input.trim()}` : input.trim();
     setRunning(true);
     setSteps([]);
     setActiveStep(null);
     setFinalResult(null);
     setError(null);
+    setAttachment(null);
     try {
       const result = await runFlow(
         flow,
         agents,
-        input.trim(),
+        initialInput,
         (step) => {
           setSteps((cur) => [...cur, step]);
           setActiveStep(null);
@@ -103,6 +151,7 @@ export function RunFlowScreen({ route, navigation }: any) {
             <Text style={styles.stepMeta}>
               {item.stats.tokens} tok · {item.stats.tokensPerSecond.toFixed(1)} tok/s
             </Text>
+            <ContextWindowMeter usedTokens={item.stats.promptTokens} maxTokens={flow.contextLength} label="This step" />
           </View>
         )}
         ListEmptyComponent={
@@ -139,17 +188,29 @@ export function RunFlowScreen({ route, navigation }: any) {
         }
       />
 
-      <View style={styles.inputRow}>
-        <TextInput
-          value={input}
-          onChangeText={setInput}
-          placeholder="Enter input for this flow..."
-          placeholderTextColor={colors.textSecondary}
-          style={styles.input}
-          multiline
-          editable={!running}
-        />
-        <Button label={running ? "Running..." : "▶"} onPress={run} variant="primary" loading={running} disabled={!input.trim()} />
+      <View style={styles.composer}>
+        {flow.contextLength ? (
+          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={flow.contextLength} label="Next input" />
+        ) : null}
+        {attachment ? (
+          <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />
+        ) : null}
+        {attachError ? <Text style={styles.attachErrorText}>{attachError}</Text> : null}
+        <View style={styles.inputRow}>
+          <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
+            <Text style={styles.attachButtonLabel}>+File</Text>
+          </Pressable>
+          <TextInput
+            value={input}
+            onChangeText={setInput}
+            placeholder="Enter input for this flow..."
+            placeholderTextColor={colors.textSecondary}
+            style={styles.input}
+            multiline
+            editable={!running}
+          />
+          <Button label={running ? "Running..." : "▶"} onPress={run} variant="primary" loading={running} disabled={!input.trim()} />
+        </View>
       </View>
     </View>
   );
@@ -201,15 +262,28 @@ function createStyles(colors: ColorPalette) {
     finalText: { color: colors.textPrimary, fontSize: 15, lineHeight: 21, textAlign: "justify" },
     errorBadge: { color: colors.error, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
     errorText: { color: colors.error, fontSize: 13 },
-    inputRow: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      gap: spacing.sm,
+    composer: {
       borderTopWidth: 1,
       borderTopColor: colors.border,
       backgroundColor: colors.surface,
       padding: spacing.sm,
     },
+    attachErrorText: { color: colors.error, fontSize: 11, marginBottom: spacing.xs },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "flex-end",
+      gap: spacing.sm,
+    },
+    attachButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceAlt,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.sm,
+    },
+    attachButtonLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
     input: {
       flex: 1,
       borderWidth: 1,

@@ -7,6 +7,8 @@ import { ChatBubble } from "../components/ChatBubble";
 import { PickerModal } from "../components/PickerModal";
 import { GuideStep } from "../components/PageGuideModal";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { ContextWindowMeter } from "../components/ContextWindowMeter";
+import { AttachmentChip } from "../components/AttachmentChip";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
@@ -17,12 +19,13 @@ import {
   selectSessionsForProject,
 } from "../state/useProjectStore";
 import { modelPath, isModelDownloaded } from "../services/modelStorage";
-import { ensureLoaded, complete } from "../services/llamaEngine";
+import { ensureLoaded, complete, countTokens } from "../services/llamaEngine";
 import { runFlow } from "../services/flowRunner";
 import { useFlowStore } from "../state/useFlowStore";
 import { formatInferenceStats } from "../utils/format";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { showAlert } from "../state/useAlertStore";
+import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../services/fileAttachment";
 
 interface ChatMessage {
   id: string;
@@ -108,6 +111,12 @@ export function InferenceScreen({ route, navigation }: any) {
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
   const [flowPickerOpen, setFlowPickerOpen] = useState(false);
   const [placeholder, setPlaceholder] = useState(randomPlaceholder);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  // Debounced estimate of how many tokens the NEXT message would use, so a
+  // context-window overflow is visible before hitting send, not only as a
+  // native error afterward. 0 while nothing loaded/nothing typed yet.
+  const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -203,16 +212,70 @@ export function InferenceScreen({ route, navigation }: any) {
     return fromHistory;
   }, [history, activeSessionId, pendingExchange, showInferenceStats]);
 
+  // Same window of replayed history used both to actually build a request
+  // and to estimate its token cost ahead of time - kept as one memo so the
+  // two can never drift out of sync with each other.
+  const priorTurns = useMemo(() => {
+    if (!activeSessionId) return [];
+    return selectHistoryForSession(history, activeSessionId)
+      .slice()
+      .reverse()
+      .slice(-MAX_CONTEXT_EXCHANGES)
+      .flatMap((h) => [
+        { role: "user" as const, content: h.prompt },
+        { role: "assistant" as const, content: h.response },
+      ]);
+  }, [history, activeSessionId]);
+
+  useEffect(() => {
+    if (activeFlow || !activeProject?.modelFilename) {
+      setLiveTokenEstimate(0);
+      return;
+    }
+    const attachmentText = attachment ? formatAttachmentForPrompt(attachment) + "\n\n" : "";
+    const candidateText = [...priorTurns.map((m) => m.content), attachmentText + prompt].join("\n\n");
+    if (!candidateText.trim()) {
+      setLiveTokenEstimate(0);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      countTokens(candidateText).then((count) => {
+        if (!cancelled) setLiveTokenEstimate(count);
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [prompt, attachment, priorTurns, activeFlow, activeProject?.modelFilename]);
+
+  const onPickAttachment = async () => {
+    setAttachError(null);
+    try {
+      const picked = await pickTextAttachment();
+      if (picked) setAttachment(picked);
+    } catch (err) {
+      setAttachError(String(err instanceof Error ? err.message : err));
+    }
+  };
+
   const send = useCallback(async () => {
     if (!prompt.trim() || !activeProject || !activeSessionId) return;
     const trimmedPrompt = prompt.trim();
+    const currentAttachment = attachment;
     const sessionId = activeSessionId;
     setPrompt("");
+    setAttachment(null);
     setPendingExchange({ sessionId, prompt: trimmedPrompt, output: "" });
     setRunning(true);
     try {
+      const messageContent = currentAttachment
+        ? `${formatAttachmentForPrompt(currentAttachment)}\n\n${trimmedPrompt}`
+        : trimmedPrompt;
+
       if (activeFlow) {
-        const result = await runFlow(activeFlow, agents, trimmedPrompt, () => {});
+        const result = await runFlow(activeFlow, agents, messageContent, () => {});
         addHistoryEntry({
           projectId: activeProject.id,
           sessionId,
@@ -236,19 +299,10 @@ export function InferenceScreen({ route, navigation }: any) {
 
       await ensureLoaded(modelPath(activeProject.modelFilename), { contextLength: activeProject.contextLength });
 
-      const priorTurns = selectHistoryForSession(history, sessionId)
-        .slice()
-        .reverse()
-        .slice(-MAX_CONTEXT_EXCHANGES)
-        .flatMap((h) => [
-          { role: "user" as const, content: h.prompt },
-          { role: "assistant" as const, content: h.response },
-        ]);
-
       let fullText = "";
       const result = await complete(
         {
-          messages: [...priorTurns, { role: "user", content: trimmedPrompt }],
+          messages: [...priorTurns, { role: "user", content: messageContent }],
           temperature: activeProject.temperature,
           topP: activeProject.topP,
           topK: activeProject.topK,
@@ -277,7 +331,7 @@ export function InferenceScreen({ route, navigation }: any) {
       setRunning(false);
       setPendingExchange(null);
     }
-  }, [activeProject, activeSessionId, activeFlow, agents, prompt, history, addHistoryEntry]);
+  }, [activeProject, activeSessionId, activeFlow, agents, prompt, attachment, priorTurns, addHistoryEntry]);
 
   return (
     <View style={[styles.container, { paddingBottom: keyboardHeight ? keyboardHeight + spacing.md : 0 }]}>
@@ -410,22 +464,34 @@ export function InferenceScreen({ route, navigation }: any) {
         }
       />
 
-      <View style={styles.promptRow}>
-        <TextInput
-          value={prompt}
-          onChangeText={setPrompt}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
-          style={styles.input}
-          multiline
-        />
-        <Button
-          label="➤"
-          onPress={send}
-          loading={running}
-          disabled={activeFlow ? !(activeFlow.modelFilename && activeFlow.startNodeId) : !activeProject?.modelFilename}
-          labelStyle={styles.sendIcon}
-        />
+      <View style={styles.composer}>
+        {!activeFlow && activeProject?.contextLength ? (
+          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={activeProject.contextLength} label="Next message" />
+        ) : null}
+        {attachment ? (
+          <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />
+        ) : null}
+        {attachError ? <Text style={styles.attachError}>{attachError}</Text> : null}
+        <View style={styles.promptRow}>
+          <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
+            <Text style={styles.attachButtonLabel}>+File</Text>
+          </Pressable>
+          <TextInput
+            value={prompt}
+            onChangeText={setPrompt}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textSecondary}
+            style={styles.input}
+            multiline
+          />
+          <Button
+            label="➤"
+            onPress={send}
+            loading={running}
+            disabled={activeFlow ? !(activeFlow.modelFilename && activeFlow.startNodeId) : !activeProject?.modelFilename}
+            labelStyle={styles.sendIcon}
+          />
+        </View>
       </View>
     </View>
   );
@@ -455,16 +521,28 @@ function createStyles(colors: ColorPalette) {
     empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
     emptyState: { alignItems: "center", marginTop: spacing.lg, gap: spacing.sm },
     emptyLink: { color: colors.accent, fontSize: 13, fontWeight: "600" },
-    promptRow: {
-      flexDirection: "row",
-      gap: spacing.sm,
-      alignItems: "stretch",
+    composer: {
       paddingHorizontal: spacing.md,
       paddingTop: spacing.sm,
       paddingBottom: spacing.sm,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
+    attachError: { color: colors.error, fontSize: 11, marginBottom: spacing.xs },
+    promptRow: {
+      flexDirection: "row",
+      gap: spacing.sm,
+      alignItems: "stretch",
+    },
+    attachButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacing.sm,
+    },
+    attachButtonLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
     input: {
       flex: 1,
       borderWidth: 1,
