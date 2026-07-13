@@ -70,7 +70,7 @@ function createStyles(colors: ColorPalette) {
     },
     cardDestructive: { borderTopColor: colors.error },
     title: { color: colors.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: spacing.sm },
-    message: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: spacing.lg, textAlign: "justify" },
+    message: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: spacing.lg },
     buttonRow: { flexDirection: "row", gap: spacing.sm },
     buttonHalf: { flex: 1 },
   });

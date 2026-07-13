@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { quantFromFilename } from "../utils/quant";
 
 export interface LocalModel {
@@ -26,6 +27,16 @@ export function modelPath(filename: string): string {
 export async function listLocalModels(): Promise<LocalModel[]> {
   await ensureModelsDir();
   const filenames = await FileSystem.readDirectoryAsync(MODELS_DIR);
+  // `.part` files are always orphaned by the time this runs: useDownloadStore
+  // isn't persisted, so a real in-progress download can't survive past an
+  // app restart — any `.part` still on disk is leftover from a process kill
+  // mid-download (see downloadModel's comment) and would just sit there
+  // wasting storage forever otherwise.
+  await Promise.all(
+    filenames
+      .filter((f) => f.endsWith(".gguf.part"))
+      .map((f) => FileSystem.deleteAsync(`${MODELS_DIR}${f}`, { idempotent: true }))
+  );
   const models: LocalModel[] = [];
   for (const filename of filenames) {
     if (!filename.endsWith(".gguf")) continue;
@@ -48,6 +59,64 @@ export async function isModelDownloaded(filename: string): Promise<boolean> {
 
 export async function deleteLocalModel(filename: string): Promise<void> {
   await FileSystem.deleteAsync(modelPath(filename), { idempotent: true });
+  await clearModelSource(filename);
+}
+
+/** Lets a downloaded model be copied out to a user-chosen folder (e.g. to
+ * back it up, or hand it to another app) — Android's scoped storage means
+ * the app's own model directory isn't visible to the user or other apps, so
+ * this is the only way out. Uses the native copyAsync between the app's
+ * file:// path and the chosen SAF destination rather than reading the whole
+ * (often multi-GB) file into a JS string, which would risk an OOM crash on
+ * a model of any real size. Returns false if the user cancelled the folder
+ * picker, true once the copy actually completes. */
+export async function exportModelToDevice(filename: string): Promise<boolean> {
+  const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+  if (!permissions.granted) return false;
+  const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+    permissions.directoryUri,
+    filename,
+    "application/octet-stream"
+  );
+  await FileSystem.StorageAccessFramework.copyAsync({ from: modelPath(filename), to: destUri });
+  return true;
+}
+
+const MODEL_SOURCES_KEY = "pocketcoder-model-sources";
+
+async function readModelSources(): Promise<Record<string, string>> {
+  try {
+    const raw = await AsyncStorage.getItem(MODEL_SOURCES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Downloaded models are identified on disk purely by filename, but many
+ * GGUF repos reuse generic filenames (e.g. "model.Q4_K_M.gguf") across
+ * unrelated models — without this, a different repo's file sharing that
+ * name would silently show as already-downloaded, or get overwritten by it.
+ * This records which repo a given filename actually came from so callers can
+ * detect that mismatch. Absent entry (never recorded, e.g. an import-from-
+ * device or a model downloaded before this tracking existed) is treated
+ * leniently by callers as "unknown provenance", not a conflict. */
+export async function recordModelSource(filename: string, repoId: string): Promise<void> {
+  const sources = await readModelSources();
+  sources[filename] = repoId;
+  await AsyncStorage.setItem(MODEL_SOURCES_KEY, JSON.stringify(sources));
+}
+
+export async function getModelSource(filename: string): Promise<string | null> {
+  const sources = await readModelSources();
+  return sources[filename] ?? null;
+}
+
+async function clearModelSource(filename: string): Promise<void> {
+  const sources = await readModelSources();
+  if (!(filename in sources)) return;
+  delete sources[filename];
+  await AsyncStorage.setItem(MODEL_SOURCES_KEY, JSON.stringify(sources));
 }
 
 export interface DownloadHandle {
@@ -58,9 +127,14 @@ export interface DownloadHandle {
 
 export function downloadModel(url: string, filename: string, onProgress: (fraction: number) => void): DownloadHandle {
   const destination = modelPath(filename);
+  // Bytes land here, never at `destination` directly, until the download is
+  // confirmed complete — a process kill mid-download (OS memory pressure,
+  // force-close, crash) then leaves at most a `.part` file, never something
+  // indistinguishable from a real, loadable model at the final filename.
+  const partialDestination = `${destination}.part`;
   let cancelled = false;
 
-  const resumable = FileSystem.createDownloadResumable(url, destination, {}, (data) => {
+  const resumable = FileSystem.createDownloadResumable(url, partialDestination, {}, (data) => {
     if (data.totalBytesExpectedToWrite > 0) {
       onProgress(data.totalBytesWritten / data.totalBytesExpectedToWrite);
     }
@@ -68,15 +142,13 @@ export function downloadModel(url: string, filename: string, onProgress: (fracti
 
   const done = ensureModelsDir()
     .then(() => resumable.downloadAsync())
-    .then((result) => {
+    .then(async (result) => {
       if (cancelled) throw new Error("cancelled");
       if (!result || result.status !== 200) throw new Error(`download failed: HTTP ${result?.status}`);
+      await FileSystem.moveAsync({ from: partialDestination, to: destination });
     })
     .catch(async (err) => {
-      // Whatever partial bytes were written must not linger — createDownloadResumable
-      // writes straight to the final destination, so a leftover partial file would
-      // otherwise look exactly like a complete, valid model to listLocalModels().
-      await FileSystem.deleteAsync(destination, { idempotent: true });
+      await FileSystem.deleteAsync(partialDestination, { idempotent: true });
       throw err;
     });
 
@@ -85,7 +157,7 @@ export function downloadModel(url: string, filename: string, onProgress: (fracti
     cancel: async () => {
       cancelled = true;
       await resumable.cancelAsync();
-      await FileSystem.deleteAsync(destination, { idempotent: true });
+      await FileSystem.deleteAsync(partialDestination, { idempotent: true });
     },
   };
 }

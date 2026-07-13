@@ -11,6 +11,10 @@ import { AppearanceSettingsScreen } from "../screens/settings/AppearanceSettings
 import { ChatDownloadsSettingsScreen } from "../screens/settings/ChatDownloadsSettingsScreen";
 import { PerformanceSettingsScreen } from "../screens/settings/PerformanceSettingsScreen";
 import { AboutSettingsScreen } from "../screens/settings/AboutSettingsScreen";
+import { DiagnosticsScreen } from "../screens/settings/DiagnosticsScreen";
+import { DeveloperOptionsScreen } from "../screens/settings/DeveloperOptionsScreen";
+import { FailureLogScreen } from "../screens/settings/FailureLogScreen";
+import { StorageInspectorScreen } from "../screens/settings/StorageInspectorScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -37,6 +41,10 @@ export function AppNavigator() {
         />
         <Stack.Screen name="Performance Settings" component={PerformanceSettingsScreen} options={{ title: "Performance" }} />
         <Stack.Screen name="About Settings" component={AboutSettingsScreen} options={{ title: "About" }} />
+        <Stack.Screen name="Developer Options" component={DeveloperOptionsScreen} options={{ title: "Developer Options" }} />
+        <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} options={{ title: "Diagnostics" }} />
+        <Stack.Screen name="Failure Log" component={FailureLogScreen} options={{ title: "Failure Log" }} />
+        <Stack.Screen name="Storage Inspector" component={StorageInspectorScreen} options={{ title: "Storage Inspector" }} />
       </Stack.Navigator>
       <AlertModalHost />
       <NetworkPromptModal />

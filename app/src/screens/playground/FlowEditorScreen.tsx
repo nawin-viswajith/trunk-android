@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { TextInput } from "../../components/TextInput";
@@ -7,16 +7,60 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../components/Button";
 import { CheckIndicator } from "../../components/CheckIndicator";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { AddTile } from "../../components/AddTile";
 import { FlowCanvas } from "../../components/flow/FlowCanvas";
-import { NODE_WIDTH } from "../../components/flow/FlowNodeView";
+import { NODE_WIDTH, NODE_HEIGHT } from "../../components/flow/FlowNodeView";
 import { listLocalModels, LocalModel } from "../../services/modelStorage";
 import { selectAgent, selectFlow, useFlowStore } from "../../state/useFlowStore";
+import { useSuppressTabSwipe } from "../../navigation/SwipeableScreen";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
 
 const MODEL_ROW_HEIGHT = 44;
 const MODEL_LIST_MAX_ROWS = 5;
+const NODE_GAP = spacing.md;
+
+function rectsOverlap(ax: number, ay: number, bx: number, by: number): boolean {
+  const pad = 8;
+  return ax < bx + NODE_WIDTH + pad && ax + NODE_WIDTH + pad > bx && ay < by + NODE_HEIGHT + pad && ay + NODE_HEIGHT + pad > by;
+}
+
+/** Places a new node at the center of whatever the user is currently looking
+ * at (accounting for how far they've panned the canvas), not a fixed
+ * canvas-space origin — otherwise "+" after panning away from (0,0) adds a
+ * node that's silently off-screen until the user happens to pan back over
+ * it. Searches outward in a ring pattern for a free spot if the center is
+ * occupied, and only falls back to a cascading stack (each new node offset
+ * a little further) once the search radius is exhausted. */
+function nextNodeSlot(
+  nodes: { x: number; y: number }[],
+  center: { x: number; y: number }
+): { x: number; y: number } {
+  const startX = Math.round(center.x - NODE_WIDTH / 2);
+  const startY = Math.round(center.y - NODE_HEIGHT / 2);
+  if (!nodes.some((n) => rectsOverlap(startX, startY, n.x, n.y))) return { x: startX, y: startY };
+
+  const stepX = NODE_WIDTH + NODE_GAP;
+  const stepY = NODE_HEIGHT + NODE_GAP;
+  const MAX_RING = 6;
+  for (let ring = 1; ring <= MAX_RING; ring++) {
+    for (let dx = -ring; dx <= ring; dx++) {
+      for (let dy = -ring; dy <= ring; dy++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue; // only this ring's perimeter
+        const x = startX + dx * stepX;
+        const y = startY + dy * stepY;
+        if (!nodes.some((n) => rectsOverlap(x, y, n.x, n.y))) return { x, y };
+      }
+    }
+  }
+
+  // Every nearby spot is occupied — stack in place with a small cascading
+  // offset so each new card still peeks out from behind the last one
+  // instead of perfectly hiding it.
+  const cascade = nodes.length % 6;
+  return { x: startX + cascade * 16, y: startY + cascade * 16 };
+}
 
 export function FlowEditorScreen({ route, navigation }: any) {
   const colors = useColors();
@@ -40,6 +84,12 @@ export function FlowEditorScreen({ route, navigation }: any) {
   const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [actionSheetNodeId, setActionSheetNodeId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const viewportRef = useRef({ offset: { x: 0, y: 0 }, width: 0, height: 0 });
+
+  // A fast pan across the canvas can otherwise register as a fling on the
+  // ancestor SwipeableScreen (every root tab supports fling-to-switch) and
+  // yank the user over to Inference or Projects mid-drag.
+  useSuppressTabSwipe(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -55,14 +105,23 @@ export function FlowEditorScreen({ route, navigation }: any) {
   };
 
   const handleAddAgent = (agentId: string) => {
-    const count = flow.nodes.length;
-    const x = spacing.md + (count % 3) * (NODE_WIDTH + spacing.md);
-    const y = spacing.md + Math.floor(count / 3) * 110;
+    const { offset, width, height } = viewportRef.current;
+    const center =
+      width > 0 && height > 0
+        ? { x: width / 2 - offset.x, y: height / 2 - offset.y }
+        : { x: spacing.md + NODE_WIDTH / 2, y: spacing.md + NODE_HEIGHT / 2 };
+    const { x, y } = nextNodeSlot(flow.nodes, center);
     addNode(flow.id, agentId, x, y);
     setAddAgentOpen(false);
   };
 
-  const canRun = !!flow.modelFilename && !!flow.startNodeId;
+  // `models` is refreshed on focus (see the useFocusEffect above), so this
+  // catches a model that was deleted from the Models tab since this flow was
+  // last configured — without it, Run stays enabled with a stale filename
+  // and the only feedback is a raw file-path error thrown from deep inside
+  // ensureLoaded once the user has already typed input and pressed Run.
+  const modelMissing = !!flow.modelFilename && !models.some((m) => m.filename === flow.modelFilename);
+  const canRun = !!flow.modelFilename && !!flow.startNodeId && !modelMissing;
 
   const actionSheetNode = actionSheetNodeId ? flow.nodes.find((n) => n.id === actionSheetNodeId) : undefined;
 
@@ -72,9 +131,14 @@ export function FlowEditorScreen({ route, navigation }: any) {
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backButton}>
           <Text style={styles.backButtonLabel}>‹</Text>
         </Pressable>
-        <Text style={styles.flowName} numberOfLines={1}>
-          {flow.name}
-        </Text>
+        <View style={styles.flowNameWrap}>
+          <Text style={styles.flowName} numberOfLines={1}>
+            {flow.name}
+          </Text>
+          <Text style={styles.agentCount}>
+            {flow.nodes.length} agent{flow.nodes.length === 1 ? "" : "s"}
+          </Text>
+        </View>
         <Pressable
           onPress={() => navigation.navigate("Run Flow", { flowId: flow.id })}
           disabled={!canRun}
@@ -84,9 +148,23 @@ export function FlowEditorScreen({ route, navigation }: any) {
         </Pressable>
       </View>
 
-      <Pressable onPress={() => setModelPickerOpen((v) => !v)} style={styles.modelChip}>
-        <Text style={styles.modelChipLabel} numberOfLines={1}>
-          {flow.modelFilename ? `Model: ${flow.modelFilename}` : "No model assigned - tap to choose"}
+      <AddTile label="Add Agent to Canvas" onPress={() => setAddAgentOpen(true)} />
+
+      {/* A flow with no model assigned can't ever run, and previously this
+       * read as a subdued, easy-to-miss line of small monospace text — the
+       * same visual weight as any other secondary label on the screen, for
+       * what is actually a required, blocking setting. */}
+      <Pressable
+        onPress={() => setModelPickerOpen((v) => !v)}
+        style={[styles.modelChip, modelMissing && styles.modelChipWarning, !flow.modelFilename && styles.modelChipEmpty]}
+      >
+        <Text style={styles.modelChipEyebrow}>MODEL</Text>
+        <Text style={[styles.modelChipLabel, modelMissing && styles.modelChipLabelWarning]} numberOfLines={1}>
+          {modelMissing
+            ? `${flow.modelFilename} — no longer downloaded, tap to pick another`
+            : flow.modelFilename
+              ? flow.modelFilename
+              : "No model assigned — tap to choose one"}
         </Text>
         <Text style={styles.modelChipCaret}>{modelPickerOpen ? "▲" : "▼"}</Text>
       </Pressable>
@@ -124,11 +202,10 @@ export function FlowEditorScreen({ route, navigation }: any) {
         onConnect={(sourceId, targetId) => connectNodes(flow.id, sourceId, targetId)}
         onRemoveConnection={(sourceId) => removeConnection(flow.id, sourceId)}
         onNodeLongPress={(nodeId) => setActionSheetNodeId(nodeId)}
+        onViewportChange={(info) => {
+          viewportRef.current = info;
+        }}
       />
-
-      <Pressable style={styles.fab} onPress={() => setAddAgentOpen(true)}>
-        <Text style={styles.fabLabel}>+</Text>
-      </Pressable>
 
       <Modal visible={addAgentOpen} transparent animationType="fade" onRequestClose={() => setAddAgentOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setAddAgentOpen(false)}>
@@ -228,23 +305,35 @@ function createStyles(colors: ColorPalette) {
     },
     backButton: { paddingHorizontal: spacing.sm },
     backButtonLabel: { color: colors.accent, fontSize: 28, fontWeight: "700" },
-    flowName: { flex: 1, color: colors.textPrimary, fontSize: 16, fontWeight: "700", marginHorizontal: spacing.sm },
+    flowNameWrap: { flex: 1, marginHorizontal: spacing.sm },
+    flowName: { color: colors.textPrimary, fontSize: 16, fontWeight: "700" },
+    agentCount: { color: colors.textSecondary, fontSize: 11, marginTop: 1 },
     runButton: { borderWidth: 1, borderColor: colors.accent, paddingVertical: 6, paddingHorizontal: spacing.sm },
     runButtonPressed: { backgroundColor: colors.accent + "22" },
     runButtonDisabled: { borderColor: colors.border },
     runButtonLabel: { color: colors.accent, fontSize: 12, fontWeight: "700" },
     runButtonLabelDisabled: { color: colors.textSecondary },
+    // Bumped up from a subdued single-line strip of small monospace text to
+    // a proper labeled field — a flow with no model picked can never run,
+    // so this deserves the same visual weight as a required setting, not a
+    // secondary detail.
     modelChip: {
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: colors.accentTertiary,
       backgroundColor: colors.surface,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.md,
     },
-    modelChipLabel: { flex: 1, color: colors.textSecondary, fontSize: 12, fontFamily: "monospace", marginRight: spacing.sm },
+    modelChipWarning: { borderLeftColor: colors.error },
+    modelChipEmpty: { borderLeftColor: colors.textSecondary },
+    modelChipEyebrow: { color: colors.textSecondary, fontSize: 9, fontWeight: "700", letterSpacing: 0.5, marginRight: spacing.sm },
+    modelChipLabel: { flex: 1, color: colors.textPrimary, fontSize: 13, fontWeight: "600", fontFamily: "monospace", marginRight: spacing.sm },
+    modelChipLabelWarning: { color: colors.error },
     modelChipCaret: { color: colors.textSecondary, fontSize: 10 },
     modelList: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     modelOption: {
@@ -263,18 +352,6 @@ function createStyles(colors: ColorPalette) {
     modelOptionLabelActive: { color: colors.accent, fontWeight: "600" },
     modelEmpty: { color: colors.textSecondary, fontSize: 13, padding: spacing.sm },
     agentLibraryLink: { color: colors.accentSecondary, fontSize: 13, fontWeight: "600", paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
-    fab: {
-      position: "absolute",
-      right: spacing.md,
-      bottom: spacing.lg,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    fabLabel: { color: colors.background, fontSize: 26, fontWeight: "700", lineHeight: 28 },
     backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: spacing.lg },
     sheetCard: {
       backgroundColor: colors.surface,

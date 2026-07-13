@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { AgentCard } from "../../components/flow/AgentCard";
 import { AgentEditorModal } from "../../components/flow/AgentEditorModal";
+import { AddTile } from "../../components/AddTile";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { Agent, selectAgent, useFlowStore } from "../../state/useFlowStore";
 import { ColorPalette, spacing } from "../../theme/colors";
@@ -72,6 +73,7 @@ export function AgentLibraryScreen({ navigation, route }: any) {
   return (
     <View style={styles.container}>
       <Text style={styles.subtitle}>Reusable personas for your flows</Text>
+      <AddTile label="New Agent" onPress={openCreate} />
 
       <FlatList
         style={styles.flatList}
@@ -90,7 +92,7 @@ export function AgentLibraryScreen({ navigation, route }: any) {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyTitle}>No agents yet</Text>
-            <Text style={styles.emptySubtitle}>Tap + to define a persona for your flows.</Text>
+            <Text style={styles.emptySubtitle}>Tap "New Agent" to define a persona for your flows.</Text>
           </View>
         }
       />
@@ -116,11 +118,7 @@ export function AgentLibraryScreen({ navigation, route }: any) {
             <Text style={styles.deleteChipLabel}>Delete ({selectedIds.size})</Text>
           </Pressable>
         </View>
-      ) : (
-        <Pressable style={styles.fab} onPress={openCreate}>
-          <Text style={styles.fabLabel}>+</Text>
-        </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -136,18 +134,6 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    fab: {
-      position: "absolute",
-      right: spacing.md,
-      bottom: spacing.lg,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    fabLabel: { color: colors.background, fontSize: 26, fontWeight: "700", lineHeight: 28 },
     selectionBar: {
       position: "absolute",
       left: 0,

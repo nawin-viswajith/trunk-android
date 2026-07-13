@@ -68,7 +68,7 @@ function createStyles(colors: ColorPalette) {
       padding: spacing.lg,
     },
     title: { color: colors.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: spacing.sm },
-    message: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "justify" },
+    message: { color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
     checkboxRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.md },
     checkboxLabel: { color: colors.textPrimary, fontSize: 13 },
     buttonRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },

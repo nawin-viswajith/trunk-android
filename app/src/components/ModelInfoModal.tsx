@@ -12,13 +12,15 @@ interface ModelInfoModalProps {
   model: LocalModel | null;
   onClose: () => void;
   onDelete: () => void;
+  onExport: () => void;
+  exporting?: boolean;
 }
 
 /** What we actually have for a locally-stored model — filename, quant,
  * size, when it was added, and its on-device path. There's no README/repo
  * description here because downloaded models aren't linked back to their
  * source Hugging Face repo once saved — showing one would mean faking it. */
-export function ModelInfoModal({ visible, model, onClose, onDelete }: ModelInfoModalProps) {
+export function ModelInfoModal({ visible, model, onClose, onDelete, onExport, exporting }: ModelInfoModalProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   if (!model) return null;
@@ -48,6 +50,7 @@ export function ModelInfoModal({ visible, model, onClose, onDelete }: ModelInfoM
             No description or README is available — downloaded models aren't linked back to their source Hugging
             Face repo once saved on-device.
           </Text>
+          <Button label="Export to device" onPress={onExport} variant="secondary" loading={exporting} />
           <View style={styles.buttonRow}>
             <View style={styles.buttonHalf}>
               <Button label="Close" onPress={onClose} variant="neutral" />
@@ -85,7 +88,7 @@ function createStyles(colors: ColorPalette) {
     value: { color: colors.textPrimary, fontSize: 13, fontWeight: "600" },
     pathLabel: { color: colors.textSecondary, fontSize: 13, marginTop: spacing.xs },
     path: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
-    note: { color: colors.textSecondary, fontSize: 11, textAlign: "justify", marginTop: spacing.xs, marginBottom: spacing.sm },
+    note: { color: colors.textSecondary, fontSize: 11, marginTop: spacing.xs, marginBottom: spacing.sm },
     buttonRow: { flexDirection: "row", gap: spacing.sm },
     buttonHalf: { flex: 1 },
   });

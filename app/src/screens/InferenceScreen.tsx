@@ -7,6 +7,8 @@ import { ChatBubble } from "../components/ChatBubble";
 import { PickerModal } from "../components/PickerModal";
 import { GuideStep } from "../components/PageGuideModal";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { ContextWindowMeter } from "../components/ContextWindowMeter";
+import { AttachmentChip } from "../components/AttachmentChip";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
@@ -17,12 +19,15 @@ import {
   selectSessionsForProject,
 } from "../state/useProjectStore";
 import { modelPath, isModelDownloaded } from "../services/modelStorage";
-import { ensureLoaded, complete } from "../services/llamaEngine";
-import { runFlow } from "../services/flowRunner";
+import { ensureLoaded, complete, countTokens, getActiveInferenceUnit } from "../services/llamaEngine";
+import { runFlow, FlowStepResult } from "../services/flowRunner";
+import { FlowStepsAccordion } from "../components/FlowStepsAccordion";
 import { useFlowStore } from "../state/useFlowStore";
 import { formatInferenceStats } from "../utils/format";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { showAlert } from "../state/useAlertStore";
+import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../services/fileAttachment";
+import { logFailure } from "../services/errorLog";
 
 interface ChatMessage {
   id: string;
@@ -98,15 +103,54 @@ export function InferenceScreen({ route, navigation }: any) {
   const [activeFlowId, setActiveFlowId] = useState<string | undefined>(undefined);
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
-  const [pendingExchange, setPendingExchange] = useState<{ prompt: string; output: string } | null>(null);
+  // Scoped to the session it was sent from — otherwise switching chats/
+  // projects mid-generation would show this session's still-streaming
+  // tokens rendering inside whichever session the user switched to.
+  const [pendingExchange, setPendingExchange] = useState<{ sessionId: string; prompt: string; output: string } | null>(
+    null
+  );
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
   const [flowPickerOpen, setFlowPickerOpen] = useState(false);
   const [placeholder, setPlaceholder] = useState(randomPlaceholder);
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [attachError, setAttachError] = useState<string | null>(null);
+  // Debounced estimate of how many tokens the NEXT message would use, so a
+  // context-window overflow is visible before hitting send, not only as a
+  // native error afterward. 0 while nothing loaded/nothing typed yet.
+  const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // Null until a model has actually finished loading at least once — shown
+  // next to the composer so it's visible before the user sends anything,
+  // not just discoverable after the fact from response speed.
+  const [inferenceUnit, setInferenceUnit] = useState<string | null>(null);
+  // Live per-agent breakdown for the flow run currently in flight - cleared
+  // at the start of every send() and once the exchange settles, matching
+  // Playground's Run screen (steps are a "watch it work" view of the
+  // current run, not a persisted part of chat history).
+  const [flowSteps, setFlowSteps] = useState<FlowStepResult[]>([]);
+  const [activeFlowStep, setActiveFlowStep] = useState<{ agentName: string; partialText: string } | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // Auto-scroll only follows new content while the user is already at/near
+  // the bottom - streaming tokens grow the list constantly, and without
+  // this check every single token would yank the view back down, making it
+  // impossible to scroll up and read earlier messages while a response is
+  // still generating.
+  const isNearBottomRef = useRef(true);
+  const onListScroll = (e: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number } } }) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    isNearBottomRef.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+  };
 
   useEffect(() => {
+    // Also covers the active project being deleted elsewhere (Projects tab
+    // stays mounted alongside this one) — without this, activeProjectId
+    // keeps pointing at a now-nonexistent project forever, since the guard
+    // below only fires when it's already falsy.
+    if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+      setActiveProjectId(projects[0]?.id);
+      return;
+    }
     if (!activeProjectId && projects.length > 0) setActiveProjectId(projects[0].id);
   }, [activeProjectId, projects]);
 
@@ -169,6 +213,10 @@ export function InferenceScreen({ route, navigation }: any) {
     navigation.navigate("Projects");
   }, [navigation]);
 
+  const goToPlayground = useCallback(() => {
+    navigation.navigate("Playground");
+  }, [navigation]);
+
   const messages = useMemo<ChatMessage[]>(() => {
     if (!activeSessionId) return [];
     const entries = selectHistoryForSession(history, activeSessionId).slice().reverse();
@@ -181,7 +229,7 @@ export function InferenceScreen({ route, navigation }: any) {
         meta: showInferenceStats ? formatInferenceStats(entry) : undefined,
       },
     ]);
-    if (pendingExchange) {
+    if (pendingExchange && pendingExchange.sessionId === activeSessionId) {
       fromHistory.push(
         { id: "pending-u", role: "user", content: pendingExchange.prompt },
         { id: "pending-a", role: "assistant", content: pendingExchange.output }
@@ -190,18 +238,110 @@ export function InferenceScreen({ route, navigation }: any) {
     return fromHistory;
   }, [history, activeSessionId, pendingExchange, showInferenceStats]);
 
+  // Same window of replayed history used both to actually build a request
+  // and to estimate its token cost ahead of time - kept as one memo so the
+  // two can never drift out of sync with each other.
+  const priorTurns = useMemo(() => {
+    if (!activeSessionId) return [];
+    return selectHistoryForSession(history, activeSessionId)
+      .slice()
+      .reverse()
+      .slice(-MAX_CONTEXT_EXCHANGES)
+      .flatMap((h) => [
+        { role: "user" as const, content: h.prompt },
+        { role: "assistant" as const, content: h.response },
+      ]);
+  }, [history, activeSessionId]);
+
+  // Preload the project's model as soon as it's selected, not only once the
+  // first message is actually sent — otherwise the live token estimate
+  // below silently reads 0 for that entire first message (countTokens needs
+  // a loaded context), and the inference-unit indicator has nothing to show
+  // until after a full round-trip. Direct-chat only; a Flow's model loads
+  // inside runFlow itself once Run is pressed.
+  useEffect(() => {
+    if (activeFlow || !activeProject?.modelFilename) return;
+    let cancelled = false;
+    isModelDownloaded(activeProject.modelFilename).then((downloaded) => {
+      if (!downloaded || cancelled) return;
+      ensureLoaded(modelPath(activeProject.modelFilename!), { contextLength: activeProject.contextLength })
+        .then(() => {
+          if (!cancelled) setInferenceUnit(getActiveInferenceUnit());
+        })
+        .catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFlow, activeProject?.modelFilename, activeProject?.contextLength]);
+
+  useEffect(() => {
+    if (activeFlow || !activeProject?.modelFilename) {
+      setLiveTokenEstimate(0);
+      return;
+    }
+    const attachmentText = attachment ? formatAttachmentForPrompt(attachment) + "\n\n" : "";
+    const candidateText = [...priorTurns.map((m) => m.content), attachmentText + prompt].join("\n\n");
+    if (!candidateText.trim()) {
+      setLiveTokenEstimate(0);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      countTokens(candidateText).then((count) => {
+        if (!cancelled) setLiveTokenEstimate(count);
+      });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [prompt, attachment, priorTurns, activeFlow, activeProject?.modelFilename]);
+
+  const onPickAttachment = async () => {
+    setAttachError(null);
+    try {
+      const picked = await pickTextAttachment();
+      if (picked) setAttachment(picked);
+    } catch (err) {
+      setAttachError(String(err instanceof Error ? err.message : err));
+    }
+  };
+
   const send = useCallback(async () => {
     if (!prompt.trim() || !activeProject || !activeSessionId) return;
     const trimmedPrompt = prompt.trim();
+    const currentAttachment = attachment;
+    const sessionId = activeSessionId;
     setPrompt("");
-    setPendingExchange({ prompt: trimmedPrompt, output: "" });
+    setAttachment(null);
+    setPendingExchange({ sessionId, prompt: trimmedPrompt, output: "" });
     setRunning(true);
+    setFlowSteps([]);
+    setActiveFlowStep(null);
+    // Sending is always "jump to the new message," even if the user had
+    // scrolled up to read earlier history — only mid-generation growth
+    // should respect a manual scroll-up, not the moment of sending itself.
+    isNearBottomRef.current = true;
     try {
+      const messageContent = currentAttachment
+        ? `${formatAttachmentForPrompt(currentAttachment)}\n\n${trimmedPrompt}`
+        : trimmedPrompt;
+
       if (activeFlow) {
-        const result = await runFlow(activeFlow, agents, trimmedPrompt, () => {});
+        const result = await runFlow(
+          activeFlow,
+          agents,
+          messageContent,
+          (step) => {
+            setFlowSteps((cur) => [...cur, step]);
+            setActiveFlowStep(null);
+          },
+          (progress) => setActiveFlowStep({ agentName: progress.agentName, partialText: progress.partialText })
+        );
         addHistoryEntry({
           projectId: activeProject.id,
-          sessionId: activeSessionId,
+          sessionId,
           prompt: trimmedPrompt,
           response: result,
           tokensGenerated: 0,
@@ -221,20 +361,12 @@ export function InferenceScreen({ route, navigation }: any) {
       }
 
       await ensureLoaded(modelPath(activeProject.modelFilename), { contextLength: activeProject.contextLength });
-
-      const priorTurns = selectHistoryForSession(history, activeSessionId)
-        .slice()
-        .reverse()
-        .slice(-MAX_CONTEXT_EXCHANGES)
-        .flatMap((h) => [
-          { role: "user" as const, content: h.prompt },
-          { role: "assistant" as const, content: h.response },
-        ]);
+      setInferenceUnit(getActiveInferenceUnit());
 
       let fullText = "";
       const result = await complete(
         {
-          messages: [...priorTurns, { role: "user", content: trimmedPrompt }],
+          messages: [...priorTurns, { role: "user", content: messageContent }],
           temperature: activeProject.temperature,
           topP: activeProject.topP,
           topK: activeProject.topK,
@@ -242,13 +374,13 @@ export function InferenceScreen({ route, navigation }: any) {
         },
         (token) => {
           fullText += token;
-          setPendingExchange({ prompt: trimmedPrompt, output: fullText });
+          setPendingExchange({ sessionId, prompt: trimmedPrompt, output: fullText });
         }
       );
 
       addHistoryEntry({
         projectId: activeProject.id,
-        sessionId: activeSessionId,
+        sessionId,
         prompt: trimmedPrompt,
         response: result.text,
         tokensGenerated: result.tokens,
@@ -258,12 +390,14 @@ export function InferenceScreen({ route, navigation }: any) {
         totalMs: result.totalMs,
       });
     } catch (err) {
+      logFailure(activeFlow ? "Inference (via Flow)" : "Inference", err);
       showAlert("Inference error", String(err));
     } finally {
       setRunning(false);
       setPendingExchange(null);
+      setActiveFlowStep(null);
     }
-  }, [activeProject, activeSessionId, activeFlow, agents, prompt, history, addHistoryEntry]);
+  }, [activeProject, activeSessionId, activeFlow, agents, prompt, attachment, priorTurns, addHistoryEntry]);
 
   return (
     <View style={[styles.container, { paddingBottom: keyboardHeight ? keyboardHeight + spacing.md : 0 }]}>
@@ -271,7 +405,8 @@ export function InferenceScreen({ route, navigation }: any) {
       <View style={styles.switcherRow}>
         <Pressable
           onPress={() => setProjectPickerOpen(true)}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Project</Text>
           <View style={styles.switcherValueRow}>
@@ -283,7 +418,8 @@ export function InferenceScreen({ route, navigation }: any) {
         </Pressable>
         <Pressable
           onPress={() => activeProject && setSessionPickerOpen(true)}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Chat</Text>
           <View style={styles.switcherValueRow}>
@@ -295,7 +431,8 @@ export function InferenceScreen({ route, navigation }: any) {
         </Pressable>
         <Pressable
           onPress={goToProjectDetail}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Model</Text>
           <View style={styles.switcherValueRow}>
@@ -317,7 +454,8 @@ export function InferenceScreen({ route, navigation }: any) {
             }
             setFlowPickerOpen(true);
           }}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Flow</Text>
           <View style={styles.switcherValueRow}>
@@ -336,7 +474,9 @@ export function InferenceScreen({ route, navigation }: any) {
         selectedValue={activeProjectId}
         onSelect={setActiveProjectId}
         onClose={() => setProjectPickerOpen(false)}
-        emptyLabel="No projects yet - create one in the Projects tab."
+        emptyLabel="No projects yet."
+        emptyLinkLabel="Create one in Projects ›"
+        onEmptyLinkPress={goToProjectsList}
       />
       <PickerModal
         visible={sessionPickerOpen}
@@ -361,16 +501,22 @@ export function InferenceScreen({ route, navigation }: any) {
         selectedValue={activeFlowId ?? NO_FLOW_VALUE}
         onSelect={(value) => setActiveFlowId(value === NO_FLOW_VALUE ? undefined : value)}
         onClose={() => setFlowPickerOpen(false)}
-        emptyLabel="No saved flows yet - build one in the Playground tab."
+        emptyLabel="No saved flows yet."
+        emptyLinkLabel="Build one in Playground ›"
+        onEmptyLinkPress={goToPlayground}
       />
 
       <FlatList
         ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={messages.length === 0 ? styles.emptyListContent : styles.list}
         renderItem={({ item }) => <ChatBubble role={item.role} content={item.content} meta={item.meta} />}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onScroll={onListScroll}
+        scrollEventThrottle={100}
+        onContentSizeChange={() => {
+          if (isNearBottomRef.current) listRef.current?.scrollToEnd({ animated: true });
+        }}
         ListEmptyComponent={
           !activeProject ? (
             <View style={styles.emptyState}>
@@ -390,24 +536,50 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.empty}>Send a prompt to start chatting with this project's model.</Text>
           )
         }
+        ListFooterComponent={
+          activeFlow && (flowSteps.length > 0 || activeFlowStep) ? (
+            <FlowStepsAccordion
+              steps={flowSteps.map((s) => ({
+                id: s.nodeId,
+                agentName: s.agentName,
+                output: s.output,
+                tokensPerSecond: s.stats.tokensPerSecond,
+              }))}
+              activeStep={activeFlowStep}
+            />
+          ) : null
+        }
       />
 
-      <View style={styles.promptRow}>
-        <TextInput
-          value={prompt}
-          onChangeText={setPrompt}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textSecondary}
-          style={styles.input}
-          multiline
-        />
-        <Button
-          label="➤"
-          onPress={send}
-          loading={running}
-          disabled={activeFlow ? !(activeFlow.modelFilename && activeFlow.startNodeId) : !activeProject?.modelFilename}
-          labelStyle={styles.sendIcon}
-        />
+      <View style={styles.composer}>
+        {!activeFlow && activeProject?.contextLength ? (
+          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={activeProject.contextLength} unit={inferenceUnit ?? undefined} />
+        ) : null}
+        {attachment ? (
+          <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />
+        ) : null}
+        {attachError ? <Text style={styles.attachError}>{attachError}</Text> : null}
+        <View style={styles.promptRow}>
+          <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
+            <Text style={styles.attachButtonLabel}>+</Text>
+          </Pressable>
+          <TextInput
+            value={prompt}
+            onChangeText={setPrompt}
+            placeholder={placeholder}
+            placeholderTextColor={colors.textSecondary}
+            style={styles.input}
+            multiline
+          />
+          <Button
+            label="➤"
+            onPress={send}
+            loading={running}
+            disabled={activeFlow ? !(activeFlow.modelFilename && activeFlow.startNodeId) : !activeProject?.modelFilename}
+            labelStyle={styles.sendIcon}
+            style={styles.sendButton}
+          />
+        </View>
       </View>
     </View>
   );
@@ -428,24 +600,43 @@ function createStyles(colors: ColorPalette) {
       flexGrow: 1,
     },
     switcherChipPressed: { backgroundColor: colors.surfaceAlt },
+    switcherChipDisabled: { opacity: 0.5 },
     switcherRole: { color: colors.textSecondary, fontSize: 10, fontWeight: "600", textTransform: "uppercase" },
     switcherValueRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
     switcherLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", lineHeight: 18, flexShrink: 1 },
     switcherCaret: { color: colors.textSecondary, fontSize: 20, fontWeight: "700", lineHeight: 18 },
     list: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexGrow: 1 },
-    empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
-    emptyState: { alignItems: "center", marginTop: spacing.lg, gap: spacing.sm },
+    // Vertically centers the empty state in the FlatList's full available
+    // space (not just a small margin below the header) - was previously
+    // only true for Models/Projects/Playground's own empty states, not
+    // this one.
+    emptyListContent: { flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.md },
+    empty: { color: colors.textSecondary, textAlign: "center" },
+    emptyState: { alignItems: "center", gap: spacing.sm },
     emptyLink: { color: colors.accent, fontSize: 13, fontWeight: "600" },
-    promptRow: {
-      flexDirection: "row",
-      gap: spacing.sm,
-      alignItems: "stretch",
-      paddingHorizontal: spacing.md,
+    composer: {
+      paddingHorizontal: spacing.sm,
       paddingTop: spacing.sm,
       paddingBottom: spacing.sm,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
+    attachError: { color: colors.error, fontSize: 11, marginBottom: spacing.xs },
+    promptRow: {
+      flexDirection: "row",
+      gap: spacing.xs,
+      alignItems: "flex-end",
+    },
+    attachButton: {
+      width: 44,
+      height: 44,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    attachButtonLabel: { color: colors.textSecondary, fontSize: 18 },
     input: {
       flex: 1,
       borderWidth: 1,
@@ -457,5 +648,11 @@ function createStyles(colors: ColorPalette) {
       maxHeight: 120,
     },
     sendIcon: { fontSize: 22, lineHeight: 24 },
+    sendButton: {
+      width: 44,
+      height: 44,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
   });
 }

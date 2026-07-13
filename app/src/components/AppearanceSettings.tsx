@@ -312,7 +312,7 @@ function createStyles(colors: ColorPalette) {
       marginTop: spacing.md,
       marginBottom: spacing.xs,
     },
-    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm, textAlign: "justify" },
+    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
     themeRow: { flexDirection: "row", gap: spacing.sm },
     themeChip: {
       flex: 1,

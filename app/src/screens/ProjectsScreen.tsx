@@ -7,6 +7,7 @@ import { CreateProjectModal, NewProjectParams } from "../components/CreateProjec
 import { GuideStep } from "../components/PageGuideModal";
 import { ProjectCard } from "../components/ProjectCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { AddTile } from "../components/AddTile";
 import { StatsBar } from "../components/StatsBar";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
@@ -22,7 +23,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Create one",
-    description: "Tap + to name a project, pick a downloaded model, and tune its generation settings.",
+    description: "Tap \"New Project\" to name a project, pick a downloaded model, and tune its generation settings.",
   },
   {
     title: "Open it up",
@@ -94,6 +95,7 @@ export function ProjectsScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Projects" showActions guideSteps={GUIDE_STEPS} />
+      <AddTile label="New Project" onPress={() => setCreateOpen(true)} />
       {projects.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
@@ -136,7 +138,7 @@ export function ProjectsScreen({ navigation }: any) {
           projects.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyTitle}>No projects yet</Text>
-              <Text style={styles.emptySubtitle}>Tap + to create one.</Text>
+              <Text style={styles.emptySubtitle}>Tap "New Project" to create one.</Text>
             </View>
           ) : (
             <View style={styles.emptyWrap}>
@@ -175,11 +177,7 @@ export function ProjectsScreen({ navigation }: any) {
             <Text style={styles.deleteChipLabel}>Delete ({selectedIds.size})</Text>
           </Pressable>
         </View>
-      ) : (
-        <Pressable style={styles.fab} onPress={() => setCreateOpen(true)}>
-          <Text style={styles.fabLabel}>+</Text>
-        </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -207,18 +205,6 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    fab: {
-      position: "absolute",
-      right: spacing.md,
-      bottom: spacing.lg + 40,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    fabLabel: { color: colors.background, fontSize: 26, fontWeight: "700", lineHeight: 28 },
     selectionBar: {
       position: "absolute",
       left: 0,

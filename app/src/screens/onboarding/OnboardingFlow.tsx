@@ -8,6 +8,7 @@ import { ColorPalette, DEFAULT_ACCENT_PRESET, spacing } from "../../theme/colors
 import { useColors, useThemeScheme } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { PERFORMANCE_DISCLAIMER } from "../../copy/disclaimers";
+import { detectNpuDevices, detectGpuDevices } from "../../services/llamaEngine";
 
 const SLIDES = [
   {
@@ -39,7 +40,38 @@ export function OnboardingFlow() {
   const setAccentPreset = useSettingsStore((s) => s.setAccentPreset);
   const showInferenceStats = useSettingsStore((s) => s.showInferenceStats);
   const setShowInferenceStats = useSettingsStore((s) => s.setShowInferenceStats);
+  const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
+  const setNpuAcceleration = useSettingsStore((s) => s.setNpuAcceleration);
+  const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
+  const setGpuAcceleration = useSettingsStore((s) => s.setGpuAcceleration);
   const setHasOnboarded = useSettingsStore((s) => s.setHasOnboarded);
+  const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
+  const [gpuDevices, setGpuDevices] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (phase !== "setup") return;
+    let cancelled = false;
+    detectNpuDevices().then((devices) => {
+      if (!cancelled) setNpuDevices(devices);
+    });
+    detectGpuDevices().then((devices) => {
+      if (!cancelled) setGpuDevices(devices);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
+
+  // Mutually exclusive for now, same as Settings > Performance — see
+  // ensureLoaded in llamaEngine.ts.
+  const onToggleNpu = (value: boolean) => {
+    setNpuAcceleration(value);
+    if (value && gpuAcceleration) setGpuAcceleration(false);
+  };
+  const onToggleGpu = (value: boolean) => {
+    setGpuAcceleration(value);
+    if (value && npuAcceleration) setNpuAcceleration(false);
+  };
 
   // Suggest a palette that matches the resolved scheme, but only until the
   // user actually picks one themselves (tracked by still being on the
@@ -139,6 +171,49 @@ export function OnboardingFlow() {
                 thumbColor={colors.textPrimary}
               />
             </View>
+
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Inference Unit</Text>
+            <Text style={styles.text}>
+              {npuDevices === null
+                ? "Checking this device's chipset…"
+                : npuDevices.length > 0
+                  ? "A supported Hexagon NPU was found on this device — inference can run on it instead of the CPU."
+                  : "No supported Hexagon NPU was found on this device (Qualcomm Snapdragon 8 Gen 1 or newer only) — inference will run on CPU either way."}
+            </Text>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleTextWrap}>
+                <Text style={styles.toggleLabel}>Use NPU when available</Text>
+                <Text style={styles.toggleHint}>Experimental. Best suited to models under 4B parameters.</Text>
+              </View>
+              <Switch
+                value={npuAcceleration}
+                onValueChange={onToggleNpu}
+                disabled={npuDevices !== null && npuDevices.length === 0}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.textPrimary}
+              />
+            </View>
+
+            <Text style={styles.text}>
+              {gpuDevices === null
+                ? "Checking for a supported GPU…"
+                : gpuDevices.length > 0
+                  ? "A supported Adreno GPU was found on this device — inference can run on it instead of the CPU."
+                  : "No Adreno GPU detected on this device (needs Adreno 700 series or newer, exposed via OpenCL — some devices restrict this even when present) — inference will run on CPU either way."}
+            </Text>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleTextWrap}>
+                <Text style={styles.toggleLabel}>Use GPU when available</Text>
+                <Text style={styles.toggleHint}>Experimental. Currently limited to Q4_0/Q6_K quantized models.</Text>
+              </View>
+              <Switch
+                value={gpuAcceleration}
+                onValueChange={onToggleGpu}
+                disabled={gpuDevices !== null && gpuDevices.length === 0}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.textPrimary}
+              />
+            </View>
           </ScrollView>
           <View style={styles.footerSingle}>
             <Button label="Get Started" variant="primary" onPress={finish} />
@@ -156,9 +231,9 @@ function createStyles(colors: ColorPalette) {
     scrollBody: { flex: 1 },
     scrollBodyContent: { gap: spacing.md, paddingBottom: spacing.lg },
     title: { color: colors.textPrimary, fontSize: 26, fontWeight: "700" },
-    text: { color: colors.textSecondary, fontSize: 15, lineHeight: 22, textAlign: "justify" },
+    text: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
     warningTitle: { color: colors.error, fontSize: 26, fontWeight: "700" },
-    warningEmphasis: { color: colors.error, fontSize: 15, lineHeight: 22, fontWeight: "700", textAlign: "justify" },
+    warningEmphasis: { color: colors.error, fontSize: 15, lineHeight: 22, fontWeight: "700" },
     dotsRow: { flexDirection: "row", justifyContent: "center", gap: spacing.xs, marginBottom: spacing.lg },
     dot: { width: 8, height: 8, backgroundColor: colors.border },
     dotActive: { backgroundColor: colors.accent },
@@ -181,6 +256,6 @@ function createStyles(colors: ColorPalette) {
     },
     toggleTextWrap: { flex: 1 },
     toggleLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: 2 },
-    toggleHint: { color: colors.textSecondary, fontSize: 11, textAlign: "justify" },
+    toggleHint: { color: colors.textSecondary, fontSize: 11 },
   });
 }

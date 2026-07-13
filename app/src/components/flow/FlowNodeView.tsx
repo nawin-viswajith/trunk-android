@@ -8,7 +8,11 @@ import { useColors } from "../../theme/ThemeContext";
 
 export const NODE_WIDTH = 150;
 export const NODE_HEIGHT = 76;
-const HANDLE_SIZE = 18;
+// Visually bigger and with a further hitSlop on top (below) — the previous
+// 18px dot's real touch target was smaller than that even, and consistently
+// hard to land a thumb on precisely enough to connect two nodes.
+const HANDLE_SIZE = 30;
+const HANDLE_HIT_SLOP = 14;
 
 interface FlowNodeViewProps {
   node: FlowNode;
@@ -46,19 +50,28 @@ export function FlowNodeView({
 
   const pan = Gesture.Pan()
     .onUpdate((e) => {
-      setDragOffset({ x: e.translationX, y: e.translationY });
-      onDragUpdate(node.x + e.translationX, node.y + e.translationY);
+      // Rounded even during the live drag (not just on release) — a card
+      // sitting at a fractional pixel position is the same sub-pixel
+      // hairline-border-dropping issue noted below, just visible mid-drag
+      // instead of only after.
+      setDragOffset({ x: Math.round(e.translationX), y: Math.round(e.translationY) });
+      onDragUpdate(node.x + Math.round(e.translationX), node.y + Math.round(e.translationY));
     })
     .onEnd((e) => {
-      onMove(node.x + e.translationX, node.y + e.translationY);
+      // Integer pixels only: gesture translation is floating point, and a
+      // card committed at a fractional (x, y) can land its 1px border on a
+      // sub-pixel boundary that some Android densities silently don't
+      // rasterize, making that edge's border disappear until the node
+      // moves again.
+      onMove(Math.round(node.x + e.translationX), Math.round(node.y + e.translationY));
       setDragOffset({ x: 0, y: 0 });
     });
 
-  const outputTap = Gesture.Tap().onEnd(() => onTapOutputHandle());
+  const outputTap = Gesture.Tap().hitSlop(HANDLE_HIT_SLOP).onEnd(() => onTapOutputHandle());
   // A start node should never receive an incoming edge, so its input handle
   // is inert — kept in the layout (pointerEvents="none" + faded) so node
   // width/connection-line anchor math doesn't shift between start/non-start.
-  const inputTap = Gesture.Tap().onEnd(() => {
+  const inputTap = Gesture.Tap().hitSlop(HANDLE_HIT_SLOP).onEnd(() => {
     if (!isStart) onTapInputHandle();
   });
 
@@ -87,7 +100,14 @@ export function FlowNodeView({
       </GestureDetector>
 
       <GestureDetector gesture={outputTap}>
-        <View style={[styles.handle, styles.handleRight, isPendingSource && styles.handlePending]} />
+        {/* Dimmed (not hidden) on the current end node: nothing flows out of
+         * it yet, but "end" is just "whichever node currently has no
+         * outgoing edge" — tapping this still starts a new connection to
+         * extend the chain, so it has to stay functionally identical to
+         * every other node's output handle. */}
+        <View
+          style={[styles.handle, styles.handleRight, isEnd && !isPendingSource && styles.handleDimmed, isPendingSource && styles.handlePending]}
+        />
       </GestureDetector>
     </View>
   );
@@ -132,5 +152,6 @@ function createStyles(colors: ColorPalette) {
     handleRight: { left: NODE_WIDTH - HANDLE_SIZE / 2 },
     handlePending: { backgroundColor: colors.accent, borderColor: colors.accent },
     handleHidden: { opacity: 0 },
+    handleDimmed: { opacity: 0.35 },
   });
 }

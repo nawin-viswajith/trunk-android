@@ -22,7 +22,9 @@ interface ScreenHeaderProps {
 }
 
 /** The one place every top-level screen's title row is defined, so header
- * spacing/typography can't drift screen-by-screen the way it did before. */
+ * spacing/typography can't drift screen-by-screen the way it did before.
+ * A screen's own "+" action renders as its own AddTile row below this
+ * header, not as a button in here — see AddTile.tsx. */
 export function ScreenHeader({ title, subtitle, showActions, guideSteps }: ScreenHeaderProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();

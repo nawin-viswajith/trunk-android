@@ -1,11 +1,12 @@
 import React, { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { Text } from "../../components/Text";
 import { Card } from "../../components/Card";
 import { ThemeModeSection, ColorPaletteSection } from "../../components/AppearanceSettings";
 import { ColorPalette, SecretThemeId, SECRET_THEMES, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
+import { wasSecretThemesUnlockedAtBoot } from "../../state/sessionFlags";
 import { createScreenStyles } from "../../theme/layout";
 
 export function AppearanceSettingsScreen() {
@@ -15,8 +16,19 @@ export function AppearanceSettingsScreen() {
   const useCustomFont = useSettingsStore((s) => s.useCustomFont);
   const setUseCustomFont = useSettingsStore((s) => s.setUseCustomFont);
   const secretThemesUnlocked = useSettingsStore((s) => s.secretThemesUnlocked);
+  const setSecretThemesUnlocked = useSettingsStore((s) => s.setSecretThemesUnlocked);
   const secretTheme = useSettingsStore((s) => s.secretTheme);
   const setSecretTheme = useSettingsStore((s) => s.setSecretTheme);
+
+  const turnOffSecretThemes = () => {
+    setSecretTheme("none");
+    setSecretThemesUnlocked(false);
+  };
+
+  // OR'd with the boot-time snapshot so turning the toggle off doesn't hide
+  // the whole card mid-session — it still takes effect for the next launch
+  // (see sessionFlags.ts). The Switch itself still reflects the live value.
+  const showSecretThemesCard = secretThemesUnlocked || wasSecretThemesUnlockedAtBoot();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -48,10 +60,21 @@ export function AppearanceSettingsScreen() {
         <ColorPaletteSection />
       </Card>
 
-      {secretThemesUnlocked ? (
+      {showSecretThemesCard ? (
         <Card>
-          <Text style={styles.sectionTitle}>Secret Themes</Text>
-          <Text style={styles.hint}>Fully replaces the color system above — pick "None" to go back to normal.</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Secret Themes</Text>
+            <Switch
+              value={secretThemesUnlocked}
+              onValueChange={(v) => (v ? undefined : turnOffSecretThemes())}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
+          </View>
+          <Text style={styles.hint}>
+            Fully replaces the color system above — pick "None" to go back to normal. Turn this off to hide it again;
+            find it the same way you found it (About) to bring it back.
+          </Text>
           <View style={styles.themeRow}>
             {(Object.keys(SECRET_THEMES) as SecretThemeId[]).slice(0, 2).map((id) => {
               const active = secretTheme === id;
@@ -102,7 +125,8 @@ function createStyles(colors: ColorPalette) {
     container: screen.container,
     content: { padding: spacing.md },
     sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: spacing.sm },
-    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm, textAlign: "justify" },
+    sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
     themeRow: { flexDirection: "row", gap: spacing.sm },
     themeChip: { flex: 1, borderWidth: 1, borderColor: colors.border, paddingVertical: spacing.sm, alignItems: "center" },
     themeChipActive: { borderColor: colors.accent, backgroundColor: colors.accent + "22" },

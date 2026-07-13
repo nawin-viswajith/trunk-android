@@ -173,7 +173,16 @@ export const useFlowStore = create<FlowState>()(
 
       setStartNode: (flowId, nodeId) => {
         set((state) => ({
-          flows: state.flows.map((f) => (f.id === flowId ? { ...f, startNodeId: nodeId, updatedAt: Date.now() } : f)),
+          flows: state.flows.map((f) => {
+            if (f.id !== flowId) return f;
+            // Maintains the same invariant connectNodes enforces going
+            // forward ("start never has an incoming edge") — otherwise
+            // promoting a node to start leaves a dangling edge feeding into
+            // it from whatever used to point there, silently orphaning
+            // everything upstream of that edge with no warning.
+            const nodes = nodeId ? f.nodes.map((n) => (n.nextNodeId === nodeId ? { ...n, nextNodeId: null } : n)) : f.nodes;
+            return { ...f, nodes, startNodeId: nodeId, updatedAt: Date.now() };
+          }),
         }));
       },
 

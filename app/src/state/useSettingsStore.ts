@@ -33,14 +33,36 @@ interface SettingsState {
   /** Cuts the llama.cpp thread count to save battery/heat at the cost of
    * generation speed — see LITE_MODE_THREADS in llamaEngine.ts. */
   liteMode: boolean;
+  /** Offloads inference to the Hexagon NPU (HTP) when llama.rn detects one -
+   * experimental, and only tested on Qualcomm SM8450+ (Snapdragon 8 Gen 1+).
+   * Silently has no effect on unsupported hardware; see detectNpuDevices in
+   * llamaEngine.ts. Defaults off since it's unverified on most devices. */
+  npuAcceleration: boolean;
+  /** Offloads inference to the Adreno GPU via OpenCL when llama.rn detects
+   * one — scoped to Qualcomm Adreno 700+ (see llama.rn's OpenCL section),
+   * and mutually exclusive with NPU in practice (see ensureLoaded in
+   * llamaEngine.ts — NPU wins if both are somehow on; combining them is a
+   * future hybrid mode, not this toggle pair). Defaults off for the same
+   * reason NPU does — unverified on most devices. */
+  gpuAcceleration: boolean;
   /** true = Urbanist (see theme/fonts.ts), false = platform default system font. */
   useCustomFont: boolean;
   /** Once true, the hidden theme picker stays visible in Settings forever —
    * found via 7 taps on the app icon in the About section. */
   secretThemesUnlocked: boolean;
+  /** Once true, the Developer Options tile stays visible in Settings forever
+   * — found via 14 taps (continuing past the 7-tap Secret Themes threshold)
+   * on the same app icon in the About section. */
+  developerModeUnlocked: boolean;
   /** "none" = normal light/dark + accent-preset resolution; anything else
    * fully overrides it (see SECRET_THEMES in theme/colors.ts). */
   secretTheme: SecretThemeId | "none";
+  /** Cumulative foreground time across every launch, in ms — one of the two
+   * gates (alongside having sent at least one message) on showing the
+   * feedback prompt once, ever. See usageTracking.ts. */
+  totalUsageMs: number;
+  /** Once true, the feedback prompt never shows again this install. */
+  feedbackPromptShown: boolean;
   setBackendUrl: (url: string) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setDarkContrast: (contrast: DarkContrast) => void;
@@ -50,9 +72,20 @@ interface SettingsState {
   setHasOnboarded: (value: boolean) => void;
   setMobileDataDownloads: (pref: MobileDataDownloadPref) => void;
   setLiteMode: (value: boolean) => void;
+  setNpuAcceleration: (value: boolean) => void;
+  setGpuAcceleration: (value: boolean) => void;
   setUseCustomFont: (value: boolean) => void;
   unlockSecretThemes: () => void;
+  unlockDeveloperMode: () => void;
+  /** Explicit on/off, unlike the tap-to-unlock actions above — lets a
+   * settings toggle turn either feature back off (re-hiding it, same as
+   * Android's own "Disable developer options" switch), requiring the full
+   * tap sequence again to bring it back. */
+  setSecretThemesUnlocked: (value: boolean) => void;
+  setDeveloperModeUnlocked: (value: boolean) => void;
   setSecretTheme: (theme: SecretThemeId | "none") => void;
+  addUsageMs: (ms: number) => void;
+  setFeedbackPromptShown: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -69,9 +102,14 @@ export const useSettingsStore = create<SettingsState>()(
       hasOnboarded: false,
       mobileDataDownloads: "ask",
       liteMode: false,
+      npuAcceleration: false,
+      gpuAcceleration: false,
       useCustomFont: true,
       secretThemesUnlocked: false,
+      developerModeUnlocked: false,
       secretTheme: "none",
+      totalUsageMs: 0,
+      feedbackPromptShown: false,
       setBackendUrl: (url) => set({ backendUrl: url }),
       setThemeMode: (mode) => set({ themeMode: mode }),
       setDarkContrast: (contrast) => set({ darkContrast: contrast }),
@@ -87,9 +125,16 @@ export const useSettingsStore = create<SettingsState>()(
       setHasOnboarded: (value) => set({ hasOnboarded: value }),
       setMobileDataDownloads: (pref) => set({ mobileDataDownloads: pref }),
       setLiteMode: (value) => set({ liteMode: value }),
+      setNpuAcceleration: (value) => set({ npuAcceleration: value }),
+      setGpuAcceleration: (value) => set({ gpuAcceleration: value }),
       setUseCustomFont: (value) => set({ useCustomFont: value }),
       unlockSecretThemes: () => set({ secretThemesUnlocked: true }),
+      unlockDeveloperMode: () => set({ developerModeUnlocked: true }),
+      setSecretThemesUnlocked: (value) => set({ secretThemesUnlocked: value }),
+      setDeveloperModeUnlocked: (value) => set({ developerModeUnlocked: value }),
       setSecretTheme: (theme) => set({ secretTheme: theme }),
+      addUsageMs: (ms) => set((state) => ({ totalUsageMs: state.totalUsageMs + ms })),
+      setFeedbackPromptShown: (value) => set({ feedbackPromptShown: value }),
     }),
     {
       name: "pocketcoder-settings",

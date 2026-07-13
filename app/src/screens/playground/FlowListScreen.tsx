@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "../../components/Text";
 import { TextInput } from "../../components/TextInput";
 import { ConfirmModal } from "../../components/ConfirmModal";
@@ -7,6 +8,7 @@ import { CreateFlowModal } from "../../components/flow/CreateFlowModal";
 import { FlowCard } from "../../components/flow/FlowCard";
 import { GuideStep } from "../../components/PageGuideModal";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { AddTile } from "../../components/AddTile";
 import { StatsBar } from "../../components/StatsBar";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
@@ -25,7 +27,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Wire a Flow",
-    description: "Tap + then New Flow, add Agents as nodes on the canvas, drag to arrange them, and tap an output handle then an input handle to connect them in order.",
+    description: "Tap \"New Flow or Agent\" then New Flow, add Agents as nodes on the canvas, drag to arrange them, and tap an output handle then an input handle to connect them in order.",
   },
   {
     title: "Run the chain",
@@ -35,6 +37,7 @@ const GUIDE_STEPS: GuideStep[] = [
 
 export function FlowListScreen({ navigation }: any) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const flows = useFlowStore((s) => s.flows);
   const agents = useFlowStore((s) => s.agents);
@@ -77,6 +80,7 @@ export function FlowListScreen({ navigation }: any) {
   return (
     <View style={styles.container}>
       <ScreenHeader title="Playground" showActions guideSteps={GUIDE_STEPS} />
+      <AddTile label="New Flow or Agent" onPress={() => setFabMenuOpen((v) => !v)} />
       {flows.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
@@ -118,7 +122,7 @@ export function FlowListScreen({ navigation }: any) {
           flows.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyTitle}>No flows yet</Text>
-              <Text style={styles.emptySubtitle}>Tap + to wire up your first agent chain.</Text>
+              <Text style={styles.emptySubtitle}>Tap "New Flow or Agent" to wire up your first agent chain.</Text>
             </View>
           ) : (
             <View style={styles.emptyWrap}>
@@ -140,7 +144,7 @@ export function FlowListScreen({ navigation }: any) {
 
       {fabMenuOpen ? (
         <Pressable style={styles.backdrop} onPress={() => setFabMenuOpen(false)}>
-          <View style={styles.menu}>
+          <View style={[styles.menu, { top: insets.top + 130 }]}>
             <Pressable
               style={styles.menuItem}
               onPress={() => {
@@ -193,11 +197,7 @@ export function FlowListScreen({ navigation }: any) {
             <Text style={styles.deleteChipLabel}>Delete ({selectedIds.size})</Text>
           </Pressable>
         </View>
-      ) : (
-        <Pressable style={styles.fab} onPress={() => setFabMenuOpen((v) => !v)}>
-          <Text style={styles.fabLabel}>{fabMenuOpen ? "×" : "+"}</Text>
-        </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -225,27 +225,14 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    fab: {
-      position: "absolute",
-      right: spacing.md,
-      bottom: spacing.lg + 40,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    fabLabel: { color: colors.background, fontSize: 26, fontWeight: "700", lineHeight: 28 },
     backdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
     menu: {
       position: "absolute",
+      left: spacing.md,
       right: spacing.md,
-      bottom: spacing.lg + 40 + 52 + spacing.sm,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      minWidth: 200,
     },
     menuItem: { paddingVertical: spacing.md, paddingHorizontal: spacing.md },
     menuItemLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },

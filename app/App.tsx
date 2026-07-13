@@ -1,5 +1,6 @@
 import "react-native-gesture-handler";
 import React, { useEffect, useRef, useState } from "react";
+import { AppState, Linking } from "react-native";
 import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
@@ -14,8 +15,13 @@ import { useProjectStore } from "./src/state/useProjectStore";
 import { useAppFonts } from "./src/theme/fonts";
 import { showAlert } from "./src/state/useAlertStore";
 import { isBatteryOptimizationExempt, requestBatteryOptimizationExemption } from "./src/services/batteryOptimization";
+import { FEEDBACK_FORM_URL } from "./src/copy/links";
+import { captureSessionVisibilityFlags } from "./src/state/sessionFlags";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+const FEEDBACK_USAGE_THRESHOLD_MS = 10 * 60 * 1000;
+const USAGE_TICK_MS = 15000;
 
 function AppInner() {
   const colors = useColors();
@@ -24,6 +30,37 @@ function AppInner() {
   const [bootDone, setBootDone] = useState(false);
   const fontsLoaded = useAppFonts();
   const batteryPromptShown = useRef(false);
+  const totalUsageMs = useSettingsStore((s) => s.totalUsageMs);
+  const feedbackPromptShown = useSettingsStore((s) => s.feedbackPromptShown);
+  const hasAnyChatHistory = useProjectStore((s) => s.history.length > 0);
+  const feedbackPromptTriggered = useRef(false);
+
+  // Ticks while the app is actually in the foreground, not wall-clock time —
+  // a phone left on Trunk in the background for hours shouldn't count
+  // toward "10 minutes of use" the same as active time does.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (AppState.currentState === "active") {
+        useSettingsStore.getState().addUsageMs(USAGE_TICK_MS);
+      }
+    }, USAGE_TICK_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (feedbackPromptShown || feedbackPromptTriggered.current) return;
+    if (totalUsageMs < FEEDBACK_USAGE_THRESHOLD_MS || !hasAnyChatHistory) return;
+    feedbackPromptTriggered.current = true;
+    useSettingsStore.getState().setFeedbackPromptShown(true);
+    showAlert(
+      "Enjoying Trunk?",
+      "We'd love to hear what's working and what isn't — it's a short form, and it goes straight to the people building this.",
+      [
+        { label: "Not now", variant: "neutral" },
+        { label: "Give Feedback", onPress: () => Linking.openURL(FEEDBACK_FORM_URL) },
+      ]
+    );
+  }, [totalUsageMs, hasAnyChatHistory, feedbackPromptShown]);
 
   useEffect(() => {
     // Fire-and-forget: Render's free tier spins the backend down after idle,
@@ -46,6 +83,7 @@ function AppInner() {
       if (settled) return;
       if (!useSettingsStore.persist.hasHydrated() || !useProjectStore.persist.hasHydrated()) return;
       settled = true;
+      captureSessionVisibilityFlags();
       const remaining = Math.max(0, minDuration - (Date.now() - start));
       setTimeout(() => setBootDone(true), remaining);
     };
