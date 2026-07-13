@@ -22,11 +22,12 @@ export function GradientSlider({ value, onChange, stops }: GradientSliderProps) 
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  function measureTrack() {
+  function measureTrack(onMeasured?: () => void) {
     trackRef.current?.measure((_x, _y, width, _height, pageX) => {
       trackWidthRef.current = width;
       trackPageXRef.current = pageX;
       setTrackWidth(width);
+      onMeasured?.();
     });
   }
 
@@ -49,8 +50,14 @@ export function GradientSlider({ value, onChange, stops }: GradientSliderProps) 
         onMoveShouldSetPanResponderCapture: () => true,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (evt) => {
-          measureTrack();
-          updateFromPageX(evt.nativeEvent.pageX);
+          // measure() is an async native bridge round-trip — updating from
+          // the touch immediately after kicking it off would use the stale
+          // width/pageX from the last onLayout, not this fresh measurement
+          // (onLayout doesn't re-fire just because the containing ScrollView
+          // scrolled). Applying the update inside the measure callback keeps
+          // the two writes in the order they actually need to happen.
+          const pageX = evt.nativeEvent.pageX;
+          measureTrack(() => updateFromPageX(pageX));
         },
         onPanResponderMove: (evt) => updateFromPageX(evt.nativeEvent.pageX),
       }),
@@ -58,7 +65,7 @@ export function GradientSlider({ value, onChange, stops }: GradientSliderProps) 
   );
 
   return (
-    <View ref={trackRef} style={styles.track} onLayout={measureTrack} {...panResponder.panHandlers}>
+    <View ref={trackRef} style={styles.track} onLayout={() => measureTrack()} {...panResponder.panHandlers}>
       <View style={styles.gradientRow}>
         {stops.map((color, i) => (
           <View key={i} style={[styles.segment, { backgroundColor: color }]} />

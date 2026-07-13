@@ -61,6 +61,16 @@ function randomId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// The whole store persists as one JSON blob under a single AsyncStorage key
+// (see the `persist` config below). Android's AsyncStorage is backed by
+// SQLite, whose CursorWindow has a practical ~2MB per-row ceiling — an
+// unbounded history array risks pushing that one row past it on long-running
+// use, which would fail writes (or the next launch's rehydration read) and
+// take projects/sessions down with it since they share the same key. Oldest
+// entries are dropped first; they're display/analytics history, not
+// something functionality depends on.
+const MAX_HISTORY_ENTRIES = 500;
+
 interface ProjectState {
   projects: Project[];
   sessions: ChatSession[];
@@ -154,7 +164,7 @@ export const useProjectStore = create<ProjectState>()(
       addHistoryEntry: (entry) => {
         const stored: HistoryEntry = { id: randomId(), timestamp: Date.now(), ...entry };
         set((state) => ({
-          history: [stored, ...state.history],
+          history: [stored, ...state.history].slice(0, MAX_HISTORY_ENTRIES),
           sessions: state.sessions.map((s) => (s.id === entry.sessionId ? { ...s, updatedAt: stored.timestamp } : s)),
         }));
       },

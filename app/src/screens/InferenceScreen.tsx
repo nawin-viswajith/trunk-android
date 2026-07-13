@@ -98,7 +98,12 @@ export function InferenceScreen({ route, navigation }: any) {
   const [activeFlowId, setActiveFlowId] = useState<string | undefined>(undefined);
   const [prompt, setPrompt] = useState("");
   const [running, setRunning] = useState(false);
-  const [pendingExchange, setPendingExchange] = useState<{ prompt: string; output: string } | null>(null);
+  // Scoped to the session it was sent from — otherwise switching chats/
+  // projects mid-generation would show this session's still-streaming
+  // tokens rendering inside whichever session the user switched to.
+  const [pendingExchange, setPendingExchange] = useState<{ sessionId: string; prompt: string; output: string } | null>(
+    null
+  );
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
   const [flowPickerOpen, setFlowPickerOpen] = useState(false);
@@ -107,6 +112,14 @@ export function InferenceScreen({ route, navigation }: any) {
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
+    // Also covers the active project being deleted elsewhere (Projects tab
+    // stays mounted alongside this one) — without this, activeProjectId
+    // keeps pointing at a now-nonexistent project forever, since the guard
+    // below only fires when it's already falsy.
+    if (activeProjectId && !projects.some((p) => p.id === activeProjectId)) {
+      setActiveProjectId(projects[0]?.id);
+      return;
+    }
     if (!activeProjectId && projects.length > 0) setActiveProjectId(projects[0].id);
   }, [activeProjectId, projects]);
 
@@ -177,7 +190,7 @@ export function InferenceScreen({ route, navigation }: any) {
         meta: showInferenceStats ? formatInferenceStats(entry) : undefined,
       },
     ]);
-    if (pendingExchange) {
+    if (pendingExchange && pendingExchange.sessionId === activeSessionId) {
       fromHistory.push(
         { id: "pending-u", role: "user", content: pendingExchange.prompt },
         { id: "pending-a", role: "assistant", content: pendingExchange.output }
@@ -189,15 +202,16 @@ export function InferenceScreen({ route, navigation }: any) {
   const send = useCallback(async () => {
     if (!prompt.trim() || !activeProject || !activeSessionId) return;
     const trimmedPrompt = prompt.trim();
+    const sessionId = activeSessionId;
     setPrompt("");
-    setPendingExchange({ prompt: trimmedPrompt, output: "" });
+    setPendingExchange({ sessionId, prompt: trimmedPrompt, output: "" });
     setRunning(true);
     try {
       if (activeFlow) {
         const result = await runFlow(activeFlow, agents, trimmedPrompt, () => {});
         addHistoryEntry({
           projectId: activeProject.id,
-          sessionId: activeSessionId,
+          sessionId,
           prompt: trimmedPrompt,
           response: result,
           tokensGenerated: 0,
@@ -218,7 +232,7 @@ export function InferenceScreen({ route, navigation }: any) {
 
       await ensureLoaded(modelPath(activeProject.modelFilename), { contextLength: activeProject.contextLength });
 
-      const priorTurns = selectHistoryForSession(history, activeSessionId)
+      const priorTurns = selectHistoryForSession(history, sessionId)
         .slice()
         .reverse()
         .slice(-MAX_CONTEXT_EXCHANGES)
@@ -238,13 +252,13 @@ export function InferenceScreen({ route, navigation }: any) {
         },
         (token) => {
           fullText += token;
-          setPendingExchange({ prompt: trimmedPrompt, output: fullText });
+          setPendingExchange({ sessionId, prompt: trimmedPrompt, output: fullText });
         }
       );
 
       addHistoryEntry({
         projectId: activeProject.id,
-        sessionId: activeSessionId,
+        sessionId,
         prompt: trimmedPrompt,
         response: result.text,
         tokensGenerated: result.tokens,
@@ -267,7 +281,8 @@ export function InferenceScreen({ route, navigation }: any) {
       <View style={styles.switcherRow}>
         <Pressable
           onPress={() => setProjectPickerOpen(true)}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Project</Text>
           <View style={styles.switcherValueRow}>
@@ -279,7 +294,8 @@ export function InferenceScreen({ route, navigation }: any) {
         </Pressable>
         <Pressable
           onPress={() => activeProject && setSessionPickerOpen(true)}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Chat</Text>
           <View style={styles.switcherValueRow}>
@@ -291,7 +307,8 @@ export function InferenceScreen({ route, navigation }: any) {
         </Pressable>
         <Pressable
           onPress={goToProjectDetail}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Model</Text>
           <View style={styles.switcherValueRow}>
@@ -313,7 +330,8 @@ export function InferenceScreen({ route, navigation }: any) {
             }
             setFlowPickerOpen(true);
           }}
-          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed]}
+          disabled={running}
+          style={({ pressed }) => [styles.switcherChip, pressed && styles.switcherChipPressed, running && styles.switcherChipDisabled]}
         >
           <Text style={styles.switcherRole}>Flow</Text>
           <View style={styles.switcherValueRow}>
@@ -419,6 +437,7 @@ function createStyles(colors: ColorPalette) {
       flexGrow: 1,
     },
     switcherChipPressed: { backgroundColor: colors.surfaceAlt },
+    switcherChipDisabled: { opacity: 0.5 },
     switcherRole: { color: colors.textSecondary, fontSize: 10, fontWeight: "600", textTransform: "uppercase" },
     switcherValueRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
     switcherLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", lineHeight: 18, flexShrink: 1 },

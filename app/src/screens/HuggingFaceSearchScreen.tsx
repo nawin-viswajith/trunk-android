@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../components/Text";
 import { TextInput } from "../components/TextInput";
@@ -22,27 +22,40 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
   const [searched, setSearched] = useState(false);
   const [loadingPopular, setLoadingPopular] = useState(true);
   const { status: backendStatus, retry: retryBackend } = useBackendHealth();
+  // Both the mount-time "popular" fetch and an explicit search write to the
+  // same `results` state with no inherent ordering — without this, a slower
+  // popular-list request resolving after a fast explicit search would
+  // silently overwrite the user's search results with the popular list.
+  const requestIdRef = useRef(0);
 
   // No hardcoded starter list — pull real trending GGUF repos (sorted by
   // downloads, no search term) from the same endpoint a search hits.
   useEffect(() => {
+    const requestId = ++requestIdRef.current;
     huggingfaceApi
       .search("")
-      .then(setResults)
+      .then((data) => {
+        if (requestIdRef.current === requestId) setResults(data);
+      })
       .catch(() => {})
-      .finally(() => setLoadingPopular(false));
+      .finally(() => {
+        if (requestIdRef.current === requestId) setLoadingPopular(false);
+      });
   }, []);
 
   const search = async () => {
-    if (!query.trim()) return;
+    if (!query.trim() || searching) return;
+    const requestId = ++requestIdRef.current;
     setSearching(true);
     try {
-      setResults(await huggingfaceApi.search(query.trim()));
+      const data = await huggingfaceApi.search(query.trim());
+      if (requestIdRef.current !== requestId) return;
+      setResults(data);
       setSearched(true);
     } catch (err) {
-      showAlert("Search failed", String(err));
+      if (requestIdRef.current === requestId) showAlert("Search failed", String(err));
     } finally {
-      setSearching(false);
+      if (requestIdRef.current === requestId) setSearching(false);
     }
   };
 

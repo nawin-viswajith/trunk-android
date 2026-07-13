@@ -7,6 +7,7 @@ import { CheckIndicator } from "./CheckIndicator";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 import { LocalModel } from "../services/modelStorage";
+import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../utils/inferenceParams";
 
 export interface NewProjectParams {
   name: string;
@@ -38,6 +39,7 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
   const [topK, setTopK] = useState(DEFAULTS.topK);
   const [contextLength, setContextLength] = useState(DEFAULTS.contextLength);
   const [maxTokens, setMaxTokens] = useState(DEFAULTS.maxTokens);
+  const [paramError, setParamError] = useState<string | null>(null);
 
   const reset = () => {
     setName("");
@@ -48,6 +50,7 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
     setTopK(DEFAULTS.topK);
     setContextLength(DEFAULTS.contextLength);
     setMaxTokens(DEFAULTS.maxTokens);
+    setParamError(null);
   };
 
   const close = () => {
@@ -57,12 +60,12 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
 
   const create = () => {
     if (!name.trim()) return;
-    const t = parseFloat(temperature) || 0.7;
-    const tp = parseFloat(topP) || 0.9;
-    const tk = parseInt(topK, 10) || 40;
-    const cl = parseInt(contextLength, 10) || 2048;
-    const mt = parseInt(maxTokens, 10) || 512;
-    onCreate({ name: name.trim(), modelFilename, temperature: t, topP: tp, topK: tk, contextLength: cl, maxTokens: mt });
+    const parsed = parseInferenceParams({ temperature, topP, topK, contextLength, maxTokens });
+    if (!parsed) {
+      setParamError(INFERENCE_PARAM_HINT);
+      return;
+    }
+    onCreate({ name: name.trim(), modelFilename, ...parsed });
     close();
   };
 
@@ -145,6 +148,7 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
                       <Text style={styles.paramLabel}>Max tokens</Text>
                       <TextInput value={maxTokens} onChangeText={setMaxTokens} keyboardType="number-pad" style={styles.paramInput} />
                     </View>
+                    {paramError ? <Text style={styles.error}>{paramError}</Text> : null}
                   </View>
                 ) : null}
               </>
@@ -223,5 +227,6 @@ function createStyles(colors: ColorPalette) {
     },
     buttonRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
     buttonHalf: { flex: 1 },
+    error: { color: colors.error, fontSize: 12, marginTop: spacing.xs },
   });
 }

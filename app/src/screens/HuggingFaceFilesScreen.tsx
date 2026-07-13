@@ -8,7 +8,7 @@ import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi, HfFileSummary } from "../api/huggingface";
 import { checkCompatibility, CompatibilityInfo } from "../utils/compatibility";
-import { downloadModel, isModelDownloaded } from "../services/modelStorage";
+import { downloadModel, isModelDownloaded, getModelSource, recordModelSource } from "../services/modelStorage";
 import { canProceedWithDownload } from "../services/downloadPolicy";
 import { formatBytes } from "../utils/format";
 import { showAlert } from "../state/useAlertStore";
@@ -26,6 +26,10 @@ const CATEGORY_LABEL: Record<string, string> = {
 interface FileRow extends HfFileSummary {
   compatibility: CompatibilityInfo;
   downloaded: boolean;
+  /** A local file with this exact name exists, but was recorded as coming
+   * from a different repo — GGUF repos often reuse generic filenames, so
+   * "exists locally" alone isn't proof it's actually this repo's file. */
+  sourceConflict: boolean;
 }
 
 /** Walks up to the root Tab.Navigator to check whether "Models" is the
@@ -59,11 +63,16 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
     try {
       const rawFiles = await huggingfaceApi.listFiles(repoId);
       const rows = await Promise.all(
-        rawFiles.map(async (f) => ({
-          ...f,
-          compatibility: await checkCompatibility(f.size_bytes),
-          downloaded: await isModelDownloaded(f.filename),
-        }))
+        rawFiles.map(async (f) => {
+          const downloaded = await isModelDownloaded(f.filename);
+          const source = downloaded ? await getModelSource(f.filename) : null;
+          return {
+            ...f,
+            compatibility: await checkCompatibility(f.size_bytes),
+            downloaded,
+            sourceConflict: downloaded && source !== null && source !== repoId,
+          };
+        })
       );
       setFiles(rows);
     } catch (err) {
@@ -89,6 +98,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
       .then(async () => {
         stopTrackingDownload(file.filename);
         useDownloadStore.getState().clearDownload(file.filename);
+        await recordModelSource(file.filename, repoId);
         await load();
         showAlert(
           "Download complete",
@@ -113,6 +123,21 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
       showAlert("Download in progress", "Wait for the current download to finish first.");
       return;
     }
+    if (file.sourceConflict) {
+      showAlert(
+        "A different file already uses this name",
+        `A local model named "${file.filename}" already exists, downloaded from a different repo. Continuing will overwrite it.`,
+        [
+          { label: "Cancel", variant: "neutral" },
+          { label: "Continue Anyway", variant: "danger", onPress: () => confirmDownloadForCompatibility(file) },
+        ]
+      );
+      return;
+    }
+    confirmDownloadForCompatibility(file);
+  };
+
+  const confirmDownloadForCompatibility = (file: FileRow) => {
     const category = file.compatibility.category;
 
     if (category === "not_supported") {
@@ -184,15 +209,25 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
           <View style={styles.card}>
             <View style={styles.headerRow}>
               <Text style={styles.filename}>{item.filename}</Text>
-              {item.downloaded ? (
+              {item.downloaded && !item.sourceConflict ? (
                 <StatusBadge status="pass" label="DOWNLOADED" />
+              ) : item.sourceConflict ? (
+                <StatusBadge status="warning" label="NAME CONFLICT" />
               ) : (
                 <StatusBadge status={item.compatibility.category} label={CATEGORY_LABEL[item.compatibility.category]} />
               )}
             </View>
             <Text style={styles.meta}>{[item.quant, formatBytes(item.size_bytes)].filter(Boolean).join(" · ")}</Text>
-            {!item.downloaded ? <Text style={styles.compatMessage}>{item.compatibility.message}</Text> : null}
-            {!item.downloaded ? <Button label="Download" onPress={() => confirmDownload(item)} variant="secondary" /> : null}
+            {item.sourceConflict ? (
+              <Text style={styles.compatMessage}>
+                A different local model already uses this filename — downloading will overwrite it.
+              </Text>
+            ) : !item.downloaded ? (
+              <Text style={styles.compatMessage}>{item.compatibility.message}</Text>
+            ) : null}
+            {!item.downloaded || item.sourceConflict ? (
+              <Button label="Download" onPress={() => confirmDownload(item)} variant="secondary" />
+            ) : null}
           </View>
         )}
         ListEmptyComponent={!loading ? <Text style={styles.empty}>No single-file GGUF variants found in this repo.</Text> : null}

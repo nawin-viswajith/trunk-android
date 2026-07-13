@@ -18,6 +18,24 @@ import { useColors } from "../../theme/ThemeContext";
 const MODEL_ROW_HEIGHT = 44;
 const MODEL_LIST_MAX_ROWS = 5;
 
+/** Computed purely from `flow.nodes.length`, this used to collide with an
+ * existing node's stored (x,y): delete a middle node, then add a new one,
+ * and the length-based slot could land exactly on a surviving node's
+ * position (two cards perfectly overlapping, the older one undraggable
+ * until the top one is moved). Walking forward from slot 0 and skipping any
+ * slot a node already occupies guarantees a free spot regardless of which
+ * node was deleted. */
+function nextFreeGridSlot(nodes: { x: number; y: number }[]): { x: number; y: number } {
+  const occupied = new Set(nodes.map((n) => `${n.x},${n.y}`));
+  let index = 0;
+  while (true) {
+    const x = spacing.md + (index % 3) * (NODE_WIDTH + spacing.md);
+    const y = spacing.md + Math.floor(index / 3) * 110;
+    if (!occupied.has(`${x},${y}`)) return { x, y };
+    index++;
+  }
+}
+
 export function FlowEditorScreen({ route, navigation }: any) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -55,14 +73,18 @@ export function FlowEditorScreen({ route, navigation }: any) {
   };
 
   const handleAddAgent = (agentId: string) => {
-    const count = flow.nodes.length;
-    const x = spacing.md + (count % 3) * (NODE_WIDTH + spacing.md);
-    const y = spacing.md + Math.floor(count / 3) * 110;
+    const { x, y } = nextFreeGridSlot(flow.nodes);
     addNode(flow.id, agentId, x, y);
     setAddAgentOpen(false);
   };
 
-  const canRun = !!flow.modelFilename && !!flow.startNodeId;
+  // `models` is refreshed on focus (see the useFocusEffect above), so this
+  // catches a model that was deleted from the Models tab since this flow was
+  // last configured — without it, Run stays enabled with a stale filename
+  // and the only feedback is a raw file-path error thrown from deep inside
+  // ensureLoaded once the user has already typed input and pressed Run.
+  const modelMissing = !!flow.modelFilename && !models.some((m) => m.filename === flow.modelFilename);
+  const canRun = !!flow.modelFilename && !!flow.startNodeId && !modelMissing;
 
   const actionSheetNode = actionSheetNodeId ? flow.nodes.find((n) => n.id === actionSheetNodeId) : undefined;
 
@@ -85,8 +107,12 @@ export function FlowEditorScreen({ route, navigation }: any) {
       </View>
 
       <Pressable onPress={() => setModelPickerOpen((v) => !v)} style={styles.modelChip}>
-        <Text style={styles.modelChipLabel} numberOfLines={1}>
-          {flow.modelFilename ? `Model: ${flow.modelFilename}` : "No model assigned - tap to choose"}
+        <Text style={[styles.modelChipLabel, modelMissing && styles.modelChipLabelWarning]} numberOfLines={1}>
+          {modelMissing
+            ? `Model: ${flow.modelFilename} (no longer downloaded - pick another)`
+            : flow.modelFilename
+              ? `Model: ${flow.modelFilename}`
+              : "No model assigned - tap to choose"}
         </Text>
         <Text style={styles.modelChipCaret}>{modelPickerOpen ? "▲" : "▼"}</Text>
       </Pressable>
@@ -245,6 +271,7 @@ function createStyles(colors: ColorPalette) {
       paddingHorizontal: spacing.md,
     },
     modelChipLabel: { flex: 1, color: colors.textSecondary, fontSize: 12, fontFamily: "monospace", marginRight: spacing.sm },
+    modelChipLabelWarning: { color: colors.error },
     modelChipCaret: { color: colors.textSecondary, fontSize: 10 },
     modelList: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     modelOption: {

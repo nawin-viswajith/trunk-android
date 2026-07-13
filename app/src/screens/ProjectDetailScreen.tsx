@@ -14,6 +14,7 @@ import { showAlert } from "../state/useAlertStore";
 import { useProjectStore, selectProject, selectHistoryForProject, selectSessionsForProject } from "../state/useProjectStore";
 import { listLocalModels, LocalModel, modelPath, isModelDownloaded } from "../services/modelStorage";
 import { benchmarkModel } from "../services/llamaEngine";
+import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../utils/inferenceParams";
 
 export function ProjectDetailScreen({ route, navigation }: any) {
   const colors = useColors();
@@ -99,16 +100,12 @@ export function ProjectDetailScreen({ route, navigation }: any) {
   };
 
   const applyParams = () => {
-    const t = parseFloat(temperature);
-    const tp = parseFloat(topP);
-    const tk = parseInt(topK, 10);
-    const cl = parseInt(contextLength, 10);
-    const mt = parseInt(maxTokens, 10);
-    if ([t, tp, tk, cl, mt].some((v) => Number.isNaN(v))) {
-      showAlert("Invalid values", "Enter valid numbers for all parameters.");
+    const parsed = parseInferenceParams({ temperature, topP, topK, contextLength, maxTokens });
+    if (!parsed) {
+      showAlert("Invalid values", INFERENCE_PARAM_HINT);
       return;
     }
-    updateProject(projectId, { temperature: t, topP: tp, topK: tk, contextLength: cl, maxTokens: mt });
+    updateProject(projectId, parsed);
   };
 
   const confirmDelete = () => {

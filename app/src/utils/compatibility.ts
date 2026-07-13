@@ -32,16 +32,18 @@ function categorize(requiredMb: number, availableMb: number): Exclude<Compatibil
   return "not_supported";
 }
 
-let cachedDeviceMemory: { totalMb: number; availableMb: number } | null = null;
-
+// Deliberately not cached: free RAM shifts as other apps run, and a stale
+// reading here would show a "supported"/compatibility badge that no longer
+// reflects reality (e.g. a model that actually OOMs after memory pressure
+// changed since the figure was first read). DeviceInfo's native calls are
+// cheap enough that re-reading on every check is not worth trading away
+// correctness for.
 async function getDeviceMemory(): Promise<{ totalMb: number; availableMb: number } | null> {
-  if (cachedDeviceMemory) return cachedDeviceMemory;
   try {
     const [totalBytes, usedBytes] = await Promise.all([DeviceInfo.getTotalMemory(), DeviceInfo.getUsedMemory()]);
     const totalMb = totalBytes / (1024 * 1024);
     const availableMb = Math.max(0, (totalBytes - usedBytes) / (1024 * 1024));
-    cachedDeviceMemory = { totalMb, availableMb };
-    return cachedDeviceMemory;
+    return { totalMb, availableMb };
   } catch {
     return null;
   }

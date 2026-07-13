@@ -8,11 +8,28 @@ export function wsBaseUrl(): string {
   return baseUrl().replace(/^http/, "ws");
 }
 
+// Render's free-tier cold start (see backendHealth.ts) can take 30-50s, so
+// this needs to be generous — but with no timeout at all, a genuinely
+// stalled connection left the caller's loading spinner stuck indefinitely
+// with no way to recover short of leaving the screen.
+const REQUEST_TIMEOUT_MS = 60_000;
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${baseUrl()}${path}`, {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}${path}`, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) throw new Error("Request timed out - the server took too long to respond.");
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`${res.status} ${res.statusText}: ${body}`);
