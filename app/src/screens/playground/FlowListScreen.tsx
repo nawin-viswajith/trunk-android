@@ -8,6 +8,7 @@ import { CreateFlowModal } from "../../components/flow/CreateFlowModal";
 import { FlowCard } from "../../components/flow/FlowCard";
 import { GuideStep } from "../../components/PageGuideModal";
 import { ScreenHeader } from "../../components/ScreenHeader";
+import { AddTile } from "../../components/AddTile";
 import { StatsBar } from "../../components/StatsBar";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
@@ -26,7 +27,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Wire a Flow",
-    description: "Tap + then New Flow, add Agents as nodes on the canvas, drag to arrange them, and tap an output handle then an input handle to connect them in order.",
+    description: "Tap \"New Flow or Agent\" then New Flow, add Agents as nodes on the canvas, drag to arrange them, and tap an output handle then an input handle to connect them in order.",
   },
   {
     title: "Run the chain",
@@ -78,7 +79,8 @@ export function FlowListScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Playground" showActions guideSteps={GUIDE_STEPS} onAddPress={() => setFabMenuOpen((v) => !v)} />
+      <ScreenHeader title="Playground" showActions guideSteps={GUIDE_STEPS} />
+      <AddTile label="New Flow or Agent" onPress={() => setFabMenuOpen((v) => !v)} />
       {flows.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
@@ -120,7 +122,7 @@ export function FlowListScreen({ navigation }: any) {
           flows.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyTitle}>No flows yet</Text>
-              <Text style={styles.emptySubtitle}>Tap + to wire up your first agent chain.</Text>
+              <Text style={styles.emptySubtitle}>Tap "New Flow or Agent" to wire up your first agent chain.</Text>
             </View>
           ) : (
             <View style={styles.emptyWrap}>
@@ -142,7 +144,7 @@ export function FlowListScreen({ navigation }: any) {
 
       {fabMenuOpen ? (
         <Pressable style={styles.backdrop} onPress={() => setFabMenuOpen(false)}>
-          <View style={[styles.menu, { top: insets.top + 60 }]}>
+          <View style={[styles.menu, { top: insets.top + 130 }]}>
             <Pressable
               style={styles.menuItem}
               onPress={() => {
@@ -226,11 +228,11 @@ function createStyles(colors: ColorPalette) {
     backdrop: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 },
     menu: {
       position: "absolute",
+      left: spacing.md,
       right: spacing.md,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      minWidth: 200,
     },
     menuItem: { paddingVertical: spacing.md, paddingHorizontal: spacing.md },
     menuItemLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },

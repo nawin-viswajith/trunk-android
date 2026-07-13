@@ -19,18 +19,13 @@ interface ScreenHeaderProps {
    * opens a Prev/Next/Close stepper instead — Home has no guideSteps, so it
    * keeps the original single-button, all-sections-at-once HelpModal. */
   guideSteps?: GuideStep[];
-  /** Renders a "+" button in the header when provided — the primary "add"
-   * action for a screen, moved up here from a floating action button: a FAB
-   * sits right where a thumb naturally rests holding the phone, so it's
-   * both easy to cover without noticing and, being visually identical
-   * across every screen that had one, easy to lose track of which screen's
-   * "+" you're even looking at. */
-  onAddPress?: () => void;
 }
 
 /** The one place every top-level screen's title row is defined, so header
- * spacing/typography can't drift screen-by-screen the way it did before. */
-export function ScreenHeader({ title, subtitle, showActions, guideSteps, onAddPress }: ScreenHeaderProps) {
+ * spacing/typography can't drift screen-by-screen the way it did before.
+ * A screen's own "+" action renders as its own AddTile row below this
+ * header, not as a button in here — see AddTile.tsx. */
+export function ScreenHeader({ title, subtitle, showActions, guideSteps }: ScreenHeaderProps) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -46,15 +41,6 @@ export function ScreenHeader({ title, subtitle, showActions, guideSteps, onAddPr
       </View>
       {showActions ? (
         <View style={styles.actions}>
-          {onAddPress ? (
-            <Pressable
-              onPress={onAddPress}
-              hitSlop={12}
-              style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
-            >
-              <Text style={styles.addGlyph}>+</Text>
-            </Pressable>
-          ) : null}
           {guideSteps ? (
             <Pressable onPress={() => setGuideVisible(true)} hitSlop={12}>
               <Text style={styles.settingsLabel}>GUIDE</Text>
@@ -110,15 +96,5 @@ function createStyles(colors: ColorPalette) {
     infoButtonPressed: { backgroundColor: colors.textSecondary + "22" },
     infoGlyph: { fontSize: 11, fontWeight: "700", color: colors.textSecondary },
     settingsLabel: { fontSize: 13, color: colors.textSecondary, fontWeight: "600" },
-    addButton: {
-      width: 26,
-      height: 26,
-      borderWidth: 1.5,
-      borderColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    addButtonPressed: { backgroundColor: colors.accent + "22" },
-    addGlyph: { fontSize: 18, fontWeight: "700", color: colors.accent, lineHeight: 20 },
   });
 }

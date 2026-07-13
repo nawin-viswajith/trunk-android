@@ -72,7 +72,12 @@ function createStyles(colors: ColorPalette) {
       padding: spacing.lg,
     },
     title: { color: colors.textPrimary, fontSize: 17, fontWeight: "700", marginBottom: spacing.sm },
-    message: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: spacing.lg, textAlign: "justify" },
+    // Not justified: Android's justify-text stretches inter-word spacing to
+    // fill each line, which visually distorts an em dash sitting mid-
+    // sentence (common in this app's copy) into what reads as a long or
+    // doubled dash - a rendering artifact, not anything wrong with the
+    // actual text.
+    message: { color: colors.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: spacing.lg },
     buttonRow: { flexDirection: "row", gap: spacing.sm },
     buttonSingle: {},
     buttonHalf: { flex: 1 },

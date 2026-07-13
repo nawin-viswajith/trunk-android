@@ -39,6 +39,18 @@ export function RunFlowScreen({ route, navigation }: any) {
   const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
   const [inferenceUnit, setInferenceUnit] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
+  // Same reasoning as InferenceScreen: streaming steps grow the content
+  // constantly, and without this check every token would force-scroll back
+  // down, making it impossible to scroll up and read an earlier step while
+  // the flow is still running.
+  const isNearBottomRef = useRef(true);
+  const onListScroll = (e: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number } } }) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    isNearBottomRef.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+  };
+  const scrollToEndIfNearBottom = () => {
+    if (isNearBottomRef.current) listRef.current?.scrollToEnd({ animated: true });
+  };
 
   useEffect(() => {
     // Same approach as InferenceScreen: tab bar hides on keyboard
@@ -105,6 +117,10 @@ export function RunFlowScreen({ route, navigation }: any) {
     setFinalResult(null);
     setError(null);
     setAttachment(null);
+    // Running is always "jump to the new step," even if the user had
+    // scrolled up to read an earlier one - only mid-generation growth
+    // should respect a manual scroll-up, not the moment Run is pressed.
+    isNearBottomRef.current = true;
     try {
       const result = await runFlow(
         flow,
@@ -113,11 +129,11 @@ export function RunFlowScreen({ route, navigation }: any) {
         (step) => {
           setSteps((cur) => [...cur, step]);
           setActiveStep(null);
-          requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+          requestAnimationFrame(scrollToEndIfNearBottom);
         },
         (progress) => {
           setActiveStep(progress);
-          requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+          requestAnimationFrame(scrollToEndIfNearBottom);
         }
       );
       setFinalResult(result);
@@ -145,7 +161,9 @@ export function RunFlowScreen({ route, navigation }: any) {
         ref={listRef}
         style={styles.list}
         contentContainerStyle={styles.listContent}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onScroll={onListScroll}
+        scrollEventThrottle={100}
+        onContentSizeChange={scrollToEndIfNearBottom}
       >
         {steps.length === 0 && !running ? (
           <View style={styles.emptyWrap}>
@@ -185,7 +203,7 @@ export function RunFlowScreen({ route, navigation }: any) {
         {attachError ? <Text style={styles.attachErrorText}>{attachError}</Text> : null}
         <View style={styles.inputRow}>
           <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
-            <Text style={styles.attachButtonLabel}>📎</Text>
+            <Text style={styles.attachButtonLabel}>+</Text>
           </Pressable>
           <TextInput
             value={input}
@@ -196,7 +214,14 @@ export function RunFlowScreen({ route, navigation }: any) {
             multiline
             editable={!running}
           />
-          <Button label={running ? "Running..." : "▶"} onPress={run} variant="primary" loading={running} disabled={!input.trim()} />
+          <Button
+            label={running ? "Running..." : "▶"}
+            onPress={run}
+            variant="primary"
+            loading={running}
+            disabled={!input.trim()}
+            style={styles.sendButton}
+          />
         </View>
       </View>
     </View>
@@ -234,7 +259,7 @@ function createStyles(colors: ColorPalette) {
       marginBottom: spacing.sm,
     },
     stepBadge: { color: colors.accentSecondary, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
-    stepText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20, textAlign: "justify" },
+    stepText: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },
     stepMeta: { color: colors.running, fontFamily: "monospace", fontSize: 10, marginTop: spacing.xs },
     finalCard: {
       borderWidth: 1,
@@ -246,7 +271,7 @@ function createStyles(colors: ColorPalette) {
       marginBottom: spacing.sm,
     },
     finalBadge: { color: colors.accent, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
-    finalText: { color: colors.textPrimary, fontSize: 15, lineHeight: 21, textAlign: "justify" },
+    finalText: { color: colors.textPrimary, fontSize: 15, lineHeight: 21 },
     errorBadge: { color: colors.error, fontSize: 11, fontWeight: "700", marginBottom: spacing.xs },
     errorText: { color: colors.error, fontSize: 13 },
     composer: {
@@ -259,18 +284,24 @@ function createStyles(colors: ColorPalette) {
     inputRow: {
       flexDirection: "row",
       alignItems: "flex-end",
-      gap: spacing.sm,
+      gap: spacing.xs,
     },
     attachButton: {
+      width: 44,
+      height: 44,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surfaceAlt,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: spacing.sm,
-      paddingVertical: spacing.sm,
     },
     attachButtonLabel: { color: colors.textSecondary, fontSize: 18 },
+    sendButton: {
+      width: 44,
+      height: 44,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
     input: {
       flex: 1,
       borderWidth: 1,

@@ -251,7 +251,7 @@ function createStyles(colors: ColorPalette) {
     },
     suggestionLabel: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
     suggestionValue: { color: colors.accent, fontSize: 16, fontWeight: "700", marginTop: 2 },
-    suggestionNote: { color: colors.textSecondary, fontSize: 11, marginTop: spacing.xs, textAlign: "justify" },
+    suggestionNote: { color: colors.textSecondary, fontSize: 11, marginTop: spacing.xs },
     actionsRow: { flexDirection: "row", gap: spacing.sm },
     actionsRowGap: { marginTop: spacing.sm },
     quickAction: {

@@ -1,11 +1,12 @@
 import React, { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { Text } from "../../components/Text";
 import { Card } from "../../components/Card";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { createScreenStyles } from "../../theme/layout";
 import { useSettingsStore } from "../../state/useSettingsStore";
+import { TRUNK_ANDROID_REPO_URL } from "../../copy/links";
 
 const ROWS: { route: string; label: string; hint: string }[] = [
   { route: "Diagnostics", label: "Test Suite", hint: "Run the on-device self-check suite and share the log." },
@@ -20,6 +21,7 @@ export function DeveloperOptionsScreen({ navigation }: any) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const developerModeUnlocked = useSettingsStore((s) => s.developerModeUnlocked);
   const setDeveloperModeUnlocked = useSettingsStore((s) => s.setDeveloperModeUnlocked);
+  const backendUrl = useSettingsStore((s) => s.backendUrl);
 
   const turnOff = () => {
     setDeveloperModeUnlocked(false);
@@ -56,6 +58,24 @@ export function DeveloperOptionsScreen({ navigation }: any) {
           <Text style={styles.rowCaret}>›</Text>
         </Pressable>
       ))}
+
+      <Pressable
+        onPress={() => Linking.openURL(TRUNK_ANDROID_REPO_URL)}
+        style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      >
+        <View style={styles.rowTextWrap}>
+          <Text style={styles.rowLabel}>Source Repo</Text>
+          <Text style={styles.rowHint}>{TRUNK_ANDROID_REPO_URL}</Text>
+        </View>
+        <Text style={styles.rowCaret}>›</Text>
+      </Pressable>
+
+      <Card>
+        <Text style={styles.rowLabel}>Backend</Text>
+        <Text style={styles.debugLine} selectable>
+          {backendUrl}
+        </Text>
+      </Card>
     </ScrollView>
   );
 }
@@ -81,5 +101,6 @@ function createStyles(colors: ColorPalette) {
     rowLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: "600", marginBottom: 2 },
     rowHint: { color: colors.textSecondary, fontSize: 12 },
     rowCaret: { color: colors.textSecondary, fontSize: 22, fontWeight: "700" },
+    debugLine: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace", marginTop: spacing.xs },
   });
 }

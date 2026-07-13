@@ -92,7 +92,11 @@ export function RootNavigator() {
         tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarIcon: () => <Text style={{ fontSize: 16, color: colors.textSecondary }}>{ICONS[route.name] ?? "•"}</Text>,
+        // Uses the `color` react-navigation passes in (already resolved from
+        // tabBarActiveTintColor/tabBarInactiveTintColor below) instead of a
+        // hardcoded one — otherwise the icon glyph never reflects the
+        // selected tab, only the label text underneath it does.
+        tabBarIcon: ({ color }: { color: string }) => <Text style={{ fontSize: 16, color }}>{ICONS[route.name] ?? "•"}</Text>,
       })}
     >
       <Tab.Screen name="Home" component={withSwipe(HomeScreen)} options={{ headerShown: false }} />

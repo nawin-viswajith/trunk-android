@@ -1,8 +1,9 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { AgentCard } from "../../components/flow/AgentCard";
 import { AgentEditorModal } from "../../components/flow/AgentEditorModal";
+import { AddTile } from "../../components/AddTile";
 import { ConfirmModal } from "../../components/ConfirmModal";
 import { Agent, selectAgent, useFlowStore } from "../../state/useFlowStore";
 import { ColorPalette, spacing } from "../../theme/colors";
@@ -47,17 +48,6 @@ export function AgentLibraryScreen({ navigation, route }: any) {
     setEditorOpen(true);
   };
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <Pressable onPress={openCreate} hitSlop={12} style={({ pressed }) => [styles.headerAddButton, pressed && styles.headerAddButtonPressed]}>
-          <Text style={styles.headerAddGlyph}>+</Text>
-        </Pressable>
-      ),
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation, styles]);
-
   useEffect(() => {
     if (route?.params?.openCreate) {
       openCreate();
@@ -83,6 +73,7 @@ export function AgentLibraryScreen({ navigation, route }: any) {
   return (
     <View style={styles.container}>
       <Text style={styles.subtitle}>Reusable personas for your flows</Text>
+      <AddTile label="New Agent" onPress={openCreate} />
 
       <FlatList
         style={styles.flatList}
@@ -101,7 +92,7 @@ export function AgentLibraryScreen({ navigation, route }: any) {
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyTitle}>No agents yet</Text>
-            <Text style={styles.emptySubtitle}>Tap + to define a persona for your flows.</Text>
+            <Text style={styles.emptySubtitle}>Tap "New Agent" to define a persona for your flows.</Text>
           </View>
         }
       />
@@ -143,17 +134,6 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    headerAddButton: {
-      width: 30,
-      height: 30,
-      borderWidth: 1.5,
-      borderColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: spacing.sm,
-    },
-    headerAddButtonPressed: { backgroundColor: colors.accent + "22" },
-    headerAddGlyph: { fontSize: 20, fontWeight: "700", color: colors.accent, lineHeight: 22 },
     selectionBar: {
       position: "absolute",
       left: 0,

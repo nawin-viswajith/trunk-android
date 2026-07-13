@@ -8,6 +8,19 @@ import { ColorPalette, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { createScreenStyles } from "../../theme/layout";
 
+/** Every zustand store here persists as one JSON blob per key - raw, that's
+ * a single unreadable line. Pretty-printed with 2-space indentation when it
+ * parses as JSON; falls back to the raw string untouched for anything that
+ * doesn't (there's no guarantee every AsyncStorage key is JSON). */
+function formatValue(raw: string): string {
+  if (!raw) return raw;
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 /** Honest equivalent of "view/extract app data" for this app's actual
  * persistence layer — there's no sqlite database anywhere in Trunk; every
  * zustand store (projects, flows, settings) persists through AsyncStorage. */
@@ -37,7 +50,7 @@ export function StorageInspectorScreen() {
   };
 
   const shareValue = async (key: string) => {
-    await Share.share({ message: `${key}\n\n${values[key] ?? ""}` });
+    await Share.share({ message: `${key}\n\n${formatValue(values[key] ?? "")}` });
   };
 
   return (
@@ -56,7 +69,7 @@ export function StorageInspectorScreen() {
             {expanded ? (
               <View style={styles.valueWrap}>
                 <Text style={styles.valueText} selectable>
-                  {values[key] || "(empty)"}
+                  {values[key] ? formatValue(values[key]) : "(empty)"}
                 </Text>
                 <Button label="Share / Copy" onPress={() => shareValue(key)} variant="secondary" />
               </View>

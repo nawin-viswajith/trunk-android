@@ -88,7 +88,7 @@ function createStyles(colors: ColorPalette) {
     value: { color: colors.textPrimary, fontSize: 13, fontWeight: "600" },
     pathLabel: { color: colors.textSecondary, fontSize: 13, marginTop: spacing.xs },
     path: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
-    note: { color: colors.textSecondary, fontSize: 11, textAlign: "justify", marginTop: spacing.xs, marginBottom: spacing.sm },
+    note: { color: colors.textSecondary, fontSize: 11, marginTop: spacing.xs, marginBottom: spacing.sm },
     buttonRow: { flexDirection: "row", gap: spacing.sm },
     buttonHalf: { flex: 1 },
   });

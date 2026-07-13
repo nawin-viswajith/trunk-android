@@ -131,6 +131,16 @@ export function InferenceScreen({ route, navigation }: any) {
   const [flowSteps, setFlowSteps] = useState<FlowStepResult[]>([]);
   const [activeFlowStep, setActiveFlowStep] = useState<{ agentName: string; partialText: string } | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
+  // Auto-scroll only follows new content while the user is already at/near
+  // the bottom - streaming tokens grow the list constantly, and without
+  // this check every single token would yank the view back down, making it
+  // impossible to scroll up and read earlier messages while a response is
+  // still generating.
+  const isNearBottomRef = useRef(true);
+  const onListScroll = (e: { nativeEvent: { contentOffset: { y: number }; layoutMeasurement: { height: number }; contentSize: { height: number } } }) => {
+    const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
+    isNearBottomRef.current = contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+  };
 
   useEffect(() => {
     // Also covers the active project being deleted elsewhere (Projects tab
@@ -201,6 +211,10 @@ export function InferenceScreen({ route, navigation }: any) {
 
   const goToProjectsList = useCallback(() => {
     navigation.navigate("Projects");
+  }, [navigation]);
+
+  const goToPlayground = useCallback(() => {
+    navigation.navigate("Playground");
   }, [navigation]);
 
   const messages = useMemo<ChatMessage[]>(() => {
@@ -305,6 +319,10 @@ export function InferenceScreen({ route, navigation }: any) {
     setRunning(true);
     setFlowSteps([]);
     setActiveFlowStep(null);
+    // Sending is always "jump to the new message," even if the user had
+    // scrolled up to read earlier history — only mid-generation growth
+    // should respect a manual scroll-up, not the moment of sending itself.
+    isNearBottomRef.current = true;
     try {
       const messageContent = currentAttachment
         ? `${formatAttachmentForPrompt(currentAttachment)}\n\n${trimmedPrompt}`
@@ -456,7 +474,9 @@ export function InferenceScreen({ route, navigation }: any) {
         selectedValue={activeProjectId}
         onSelect={setActiveProjectId}
         onClose={() => setProjectPickerOpen(false)}
-        emptyLabel="No projects yet - create one in the Projects tab."
+        emptyLabel="No projects yet."
+        emptyLinkLabel="Create one in Projects ›"
+        onEmptyLinkPress={goToProjectsList}
       />
       <PickerModal
         visible={sessionPickerOpen}
@@ -481,16 +501,22 @@ export function InferenceScreen({ route, navigation }: any) {
         selectedValue={activeFlowId ?? NO_FLOW_VALUE}
         onSelect={(value) => setActiveFlowId(value === NO_FLOW_VALUE ? undefined : value)}
         onClose={() => setFlowPickerOpen(false)}
-        emptyLabel="No saved flows yet - build one in the Playground tab."
+        emptyLabel="No saved flows yet."
+        emptyLinkLabel="Build one in Playground ›"
+        onEmptyLinkPress={goToPlayground}
       />
 
       <FlatList
         ref={listRef}
         data={messages}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={messages.length === 0 ? styles.emptyListContent : styles.list}
         renderItem={({ item }) => <ChatBubble role={item.role} content={item.content} meta={item.meta} />}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+        onScroll={onListScroll}
+        scrollEventThrottle={100}
+        onContentSizeChange={() => {
+          if (isNearBottomRef.current) listRef.current?.scrollToEnd({ animated: true });
+        }}
         ListEmptyComponent={
           !activeProject ? (
             <View style={styles.emptyState}>
@@ -535,7 +561,7 @@ export function InferenceScreen({ route, navigation }: any) {
         {attachError ? <Text style={styles.attachError}>{attachError}</Text> : null}
         <View style={styles.promptRow}>
           <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
-            <Text style={styles.attachButtonLabel}>📎</Text>
+            <Text style={styles.attachButtonLabel}>+</Text>
           </Pressable>
           <TextInput
             value={prompt}
@@ -551,6 +577,7 @@ export function InferenceScreen({ route, navigation }: any) {
             loading={running}
             disabled={activeFlow ? !(activeFlow.modelFilename && activeFlow.startNodeId) : !activeProject?.modelFilename}
             labelStyle={styles.sendIcon}
+            style={styles.sendButton}
           />
         </View>
       </View>
@@ -579,11 +606,16 @@ function createStyles(colors: ColorPalette) {
     switcherLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", lineHeight: 18, flexShrink: 1 },
     switcherCaret: { color: colors.textSecondary, fontSize: 20, fontWeight: "700", lineHeight: 18 },
     list: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, flexGrow: 1 },
-    empty: { color: colors.textSecondary, textAlign: "center", marginTop: spacing.lg },
-    emptyState: { alignItems: "center", marginTop: spacing.lg, gap: spacing.sm },
+    // Vertically centers the empty state in the FlatList's full available
+    // space (not just a small margin below the header) - was previously
+    // only true for Models/Projects/Playground's own empty states, not
+    // this one.
+    emptyListContent: { flexGrow: 1, justifyContent: "center", paddingHorizontal: spacing.md },
+    empty: { color: colors.textSecondary, textAlign: "center" },
+    emptyState: { alignItems: "center", gap: spacing.sm },
     emptyLink: { color: colors.accent, fontSize: 13, fontWeight: "600" },
     composer: {
-      paddingHorizontal: spacing.md,
+      paddingHorizontal: spacing.sm,
       paddingTop: spacing.sm,
       paddingBottom: spacing.sm,
       borderTopWidth: 1,
@@ -592,16 +624,17 @@ function createStyles(colors: ColorPalette) {
     attachError: { color: colors.error, fontSize: 11, marginBottom: spacing.xs },
     promptRow: {
       flexDirection: "row",
-      gap: spacing.sm,
-      alignItems: "stretch",
+      gap: spacing.xs,
+      alignItems: "flex-end",
     },
     attachButton: {
+      width: 44,
+      height: 44,
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: spacing.sm,
     },
     attachButtonLabel: { color: colors.textSecondary, fontSize: 18 },
     input: {
@@ -615,5 +648,11 @@ function createStyles(colors: ColorPalette) {
       maxHeight: 120,
     },
     sendIcon: { fontSize: 22, lineHeight: 24 },
+    sendButton: {
+      width: 44,
+      height: 44,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+    },
   });
 }

@@ -9,6 +9,7 @@ import { ModelCard } from "../components/ModelCard";
 import { ModelInfoModal } from "../components/ModelInfoModal";
 import { GuideStep } from "../components/PageGuideModal";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { AddTile } from "../components/AddTile";
 import { StatsBar } from "../components/StatsBar";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
@@ -29,11 +30,11 @@ import { flushDownloadProgress, useDownloadStore } from "../state/useDownloadSto
 const GUIDE_STEPS: GuideStep[] = [
   {
     title: "Browse & download",
-    description: "Tap + then \"Browse Hugging Face\" to search GGUF models and download one straight to your device.",
+    description: "Tap \"Add a model\" then \"Browse Hugging Face\" to search GGUF models and download one straight to your device.",
   },
   {
     title: "Import your own",
-    description: "Already have a GGUF file? Tap + then \"Import from Device\" instead of downloading.",
+    description: "Already have a GGUF file? Tap \"Add a model\" then \"Import from Device\" instead of downloading.",
   },
   {
     title: "Check the details",
@@ -150,7 +151,9 @@ export function ModelsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Models" showActions guideSteps={GUIDE_STEPS} onAddPress={() => setMenuOpen((v) => !v)} />
+      <ScreenHeader title="Models" showActions guideSteps={GUIDE_STEPS} />
+      <AddTile label="Add a model" onPress={() => setMenuOpen((v) => !v)} />
+      {models.length > 0 || importing || activeDownloads.length > 0 ? (
       <View style={styles.toolbar}>
         {models.length > 0 ? (
           <View style={styles.searchRow}>
@@ -200,6 +203,7 @@ export function ModelsScreen({ navigation }: any) {
           )
         )}
       </View>
+      ) : null}
       <FlatList
         style={styles.flatList}
         data={filteredModels}
@@ -221,7 +225,7 @@ export function ModelsScreen({ navigation }: any) {
           models.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyTitle}>No models yet</Text>
-              <Text style={styles.emptySubtitle}>Tap + to browse Hugging Face or import one.</Text>
+              <Text style={styles.emptySubtitle}>Tap "Add a model" to browse Hugging Face or import one.</Text>
             </View>
           ) : (
             <View style={styles.emptyWrap}>
@@ -236,7 +240,7 @@ export function ModelsScreen({ navigation }: any) {
 
       {menuOpen ? (
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
-          <View style={[styles.menu, { top: insets.top + 60 }]}>
+          <View style={[styles.menu, { top: insets.top + 130 }]}>
             <Pressable style={styles.menuItem} onPress={importModel}>
               <Text style={styles.menuItemLabel}>Import from Device</Text>
             </Pressable>
@@ -354,11 +358,11 @@ function createStyles(colors: ColorPalette) {
     },
     menu: {
       position: "absolute",
+      left: spacing.md,
       right: spacing.md,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      minWidth: 200,
     },
     menuItem: { paddingVertical: spacing.md, paddingHorizontal: spacing.md },
     menuItemLabel: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },

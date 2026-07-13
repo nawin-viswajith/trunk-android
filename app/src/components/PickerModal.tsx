@@ -17,9 +17,25 @@ interface PickerModalProps {
   onSelect: (value: string) => void;
   onClose: () => void;
   emptyLabel?: string;
+  /** Rendered as its own tappable line right under emptyLabel - for an
+   * empty message that names another screen ("create one in the Projects
+   * tab"), this makes that screen an actual link instead of just naming it
+   * in unclickable text. Closes this modal before navigating. */
+  emptyLinkLabel?: string;
+  onEmptyLinkPress?: () => void;
 }
 
-export function PickerModal({ visible, title, options, selectedValue, onSelect, onClose, emptyLabel }: PickerModalProps) {
+export function PickerModal({
+  visible,
+  title,
+  options,
+  selectedValue,
+  onSelect,
+  onClose,
+  emptyLabel,
+  emptyLinkLabel,
+  onEmptyLinkPress,
+}: PickerModalProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   return (
@@ -29,7 +45,20 @@ export function PickerModal({ visible, title, options, selectedValue, onSelect, 
           <Text style={styles.title}>{title}</Text>
           <ScrollView style={styles.list} bounces={false}>
             {options.length === 0 ? (
-              <Text style={styles.empty}>{emptyLabel ?? "Nothing available."}</Text>
+              <>
+                <Text style={styles.empty}>{emptyLabel ?? "Nothing available."}</Text>
+                {emptyLinkLabel && onEmptyLinkPress ? (
+                  <Pressable
+                    onPress={() => {
+                      onClose();
+                      onEmptyLinkPress();
+                    }}
+                    hitSlop={8}
+                  >
+                    <Text style={styles.emptyLink}>{emptyLinkLabel}</Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : (
               options.map((opt) => {
                 const active = opt.value === selectedValue;
@@ -75,7 +104,14 @@ function createStyles(colors: ColorPalette) {
     },
     title: { color: colors.textPrimary, fontSize: 16, fontWeight: "700", padding: spacing.md, paddingBottom: spacing.sm },
     list: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
-    empty: { color: colors.textSecondary, fontSize: 13, padding: spacing.md, textAlign: "center" },
+    empty: { color: colors.textSecondary, fontSize: 13, padding: spacing.md, paddingBottom: spacing.xs, textAlign: "center" },
+    emptyLink: {
+      color: colors.accent,
+      fontSize: 13,
+      fontWeight: "600",
+      textAlign: "center",
+      paddingBottom: spacing.md,
+    },
     option: {
       flexDirection: "row",
       justifyContent: "space-between",

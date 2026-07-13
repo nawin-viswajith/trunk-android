@@ -8,15 +8,11 @@ import { useColors } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { showAlert } from "../../state/useAlertStore";
 import { createScreenStyles } from "../../theme/layout";
+import { FEEDBACK_FORM_URL, TUSKERLABS_WEBSITE_URL, TRUNK_PRODUCT_URL } from "../../copy/links";
 
 const SECRET_THEME_TAPS_TO_UNLOCK = 7;
 const DEVELOPER_MODE_TAPS_TO_UNLOCK = 14;
 const SECRET_THEME_TAP_RESET_MS = 1200;
-
-// TODO: placeholder until the real TuskerLabs/Trunk marketing site URL is
-// confirmed - not guessed, since a wrong link here is worse than no link.
-const TUSKERLABS_WEBSITE_URL = "https://tuskerlabs.dev";
-const TRUNK_PRODUCT_URL = "https://tuskerlabs.dev/trunk";
 
 export function AboutSettingsScreen({ navigation }: any) {
   const colors = useColors();
@@ -25,7 +21,6 @@ export function AboutSettingsScreen({ navigation }: any) {
   const unlockSecretThemes = useSettingsStore((s) => s.unlockSecretThemes);
   const developerModeUnlocked = useSettingsStore((s) => s.developerModeUnlocked);
   const unlockDeveloperMode = useSettingsStore((s) => s.unlockDeveloperMode);
-  const backendUrl = useSettingsStore((s) => s.backendUrl);
   const [licenseVisible, setLicenseVisible] = useState(false);
 
   const tapCountRef = useRef(0);
@@ -86,14 +81,10 @@ export function AboutSettingsScreen({ navigation }: any) {
           </View>
         </View>
         <Text style={styles.shortDescription}>
-          Chat with GGUF models, bind them to Projects, or chain reusable Agents into Flows, fully offline.
+          No cloud, no server, no account - chat with GGUF models, bind them to Projects, or chain reusable Agents
+          into Flows, fully offline.
         </Text>
         {countdownMessage ? <Text style={styles.countdown}>{countdownMessage}</Text> : null}
-        {secretThemesUnlocked ? (
-          <Text style={styles.debugLine} selectable>
-            Backend: {backendUrl}
-          </Text>
-        ) : null}
       </Card>
 
       <Pressable
@@ -104,7 +95,7 @@ export function AboutSettingsScreen({ navigation }: any) {
           <Text style={styles.licenseTileLabel}>TuskerLabs</Text>
           <Text style={styles.tileHint}>The team behind Trunk</Text>
         </View>
-        <Text style={styles.tileWebIcon}>🌐</Text>
+        <Text style={styles.licenseTileCaret}>›</Text>
       </Pressable>
 
       <Pressable
@@ -115,7 +106,18 @@ export function AboutSettingsScreen({ navigation }: any) {
           <Text style={styles.licenseTileLabel}>Trunk</Text>
           <Text style={styles.tileHint}>Product site, docs, and release notes</Text>
         </View>
-        <Text style={styles.tileWebIcon}>🌐</Text>
+        <Text style={styles.licenseTileCaret}>›</Text>
+      </Pressable>
+
+      <Pressable
+        onPress={() => Linking.openURL(FEEDBACK_FORM_URL)}
+        style={({ pressed }) => [styles.licenseTile, pressed && styles.licenseTilePressed]}
+      >
+        <View style={styles.tileTextWrap}>
+          <Text style={styles.licenseTileLabel}>Give Feedback</Text>
+          <Text style={styles.tileHint}>Short form - tell us what's working and what isn't</Text>
+        </View>
+        <Text style={styles.licenseTileCaret}>›</Text>
       </Pressable>
 
       <Pressable
@@ -126,15 +128,10 @@ export function AboutSettingsScreen({ navigation }: any) {
         <Text style={styles.licenseTileCaret}>›</Text>
       </Pressable>
 
-      {developerModeUnlocked ? (
-        <Pressable
-          onPress={() => navigation.navigate("Developer Options")}
-          style={({ pressed }) => [styles.licenseTile, pressed && styles.licenseTilePressed]}
-        >
-          <Text style={styles.licenseTileLabel}>Developer Options</Text>
-          <Text style={styles.licenseTileCaret}>›</Text>
-        </Pressable>
-      ) : null}
+      {/* Developer Options itself now lives as its own top-level row in
+       * Settings (see SettingsListScreen.tsx), gated by the same
+       * developerModeUnlocked flag this screen sets — this screen's only
+       * remaining job re: that flag is the tap-to-unlock gesture above. */}
 
       {/* TODO (see ROADMAP.md): a "Developer" tile — contact/GitHub/feedback
           link for the person(s) behind Trunk. Not wired up yet, commented
@@ -195,8 +192,7 @@ function createStyles(colors: ColorPalette) {
     heroTextWrap: { flex: 1, gap: spacing.xs },
     tagline: { color: colors.textPrimary, fontSize: 14, fontWeight: "700" },
     identity: { color: colors.textSecondary, fontSize: 11 },
-    shortDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, textAlign: "justify" },
-    debugLine: { color: colors.textSecondary, fontSize: 10, fontFamily: "monospace", marginTop: spacing.sm },
+    shortDescription: { color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
     countdown: { color: colors.accent, fontSize: 11, fontWeight: "600", marginTop: spacing.xs },
     licenseTile: {
       flexDirection: "row",
@@ -213,7 +209,6 @@ function createStyles(colors: ColorPalette) {
     licenseTileCaret: { color: colors.textSecondary, fontSize: 22, fontWeight: "700" },
     tileTextWrap: { flex: 1, marginRight: spacing.sm },
     tileHint: { color: colors.textSecondary, fontSize: 11, marginTop: 2 },
-    tileWebIcon: { fontSize: 18 },
     backdrop: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.6)",

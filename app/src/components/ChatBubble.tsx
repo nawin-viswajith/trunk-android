@@ -55,7 +55,6 @@ function createStyles(colors: ColorPalette) {
       color: colors.textPrimary,
       fontSize: 15,
       lineHeight: 21,
-      textAlign: "justify",
     },
     meta: {
       color: colors.running,

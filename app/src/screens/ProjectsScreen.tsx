@@ -7,6 +7,7 @@ import { CreateProjectModal, NewProjectParams } from "../components/CreateProjec
 import { GuideStep } from "../components/PageGuideModal";
 import { ProjectCard } from "../components/ProjectCard";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { AddTile } from "../components/AddTile";
 import { StatsBar } from "../components/StatsBar";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
@@ -22,7 +23,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Create one",
-    description: "Tap + to name a project, pick a downloaded model, and tune its generation settings.",
+    description: "Tap \"New Project\" to name a project, pick a downloaded model, and tune its generation settings.",
   },
   {
     title: "Open it up",
@@ -93,7 +94,8 @@ export function ProjectsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Projects" showActions guideSteps={GUIDE_STEPS} onAddPress={() => setCreateOpen(true)} />
+      <ScreenHeader title="Projects" showActions guideSteps={GUIDE_STEPS} />
+      <AddTile label="New Project" onPress={() => setCreateOpen(true)} />
       {projects.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
@@ -136,7 +138,7 @@ export function ProjectsScreen({ navigation }: any) {
           projects.length === 0 ? (
             <View style={styles.emptyWrap}>
               <Text style={styles.emptyTitle}>No projects yet</Text>
-              <Text style={styles.emptySubtitle}>Tap + to create one.</Text>
+              <Text style={styles.emptySubtitle}>Tap "New Project" to create one.</Text>
             </View>
           ) : (
             <View style={styles.emptyWrap}>

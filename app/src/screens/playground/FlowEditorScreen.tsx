@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../components/Button";
 import { CheckIndicator } from "../../components/CheckIndicator";
 import { ConfirmModal } from "../../components/ConfirmModal";
+import { AddTile } from "../../components/AddTile";
 import { FlowCanvas } from "../../components/flow/FlowCanvas";
 import { NODE_WIDTH, NODE_HEIGHT } from "../../components/flow/FlowNodeView";
 import { listLocalModels, LocalModel } from "../../services/modelStorage";
@@ -138,9 +139,6 @@ export function FlowEditorScreen({ route, navigation }: any) {
             {flow.nodes.length} agent{flow.nodes.length === 1 ? "" : "s"}
           </Text>
         </View>
-        <Pressable onPress={() => setAddAgentOpen(true)} hitSlop={12} style={styles.headerAddButton}>
-          <Text style={styles.headerAddGlyph}>+</Text>
-        </Pressable>
         <Pressable
           onPress={() => navigation.navigate("Run Flow", { flowId: flow.id })}
           disabled={!canRun}
@@ -149,6 +147,8 @@ export function FlowEditorScreen({ route, navigation }: any) {
           <Text style={[styles.runButtonLabel, !canRun && styles.runButtonLabelDisabled]}>▶ Run</Text>
         </Pressable>
       </View>
+
+      <AddTile label="Add Agent to Canvas" onPress={() => setAddAgentOpen(true)} />
 
       {/* A flow with no model assigned can't ever run, and previously this
        * read as a subdued, easy-to-miss line of small monospace text — the
@@ -308,16 +308,6 @@ function createStyles(colors: ColorPalette) {
     flowNameWrap: { flex: 1, marginHorizontal: spacing.sm },
     flowName: { color: colors.textPrimary, fontSize: 16, fontWeight: "700" },
     agentCount: { color: colors.textSecondary, fontSize: 11, marginTop: 1 },
-    headerAddButton: {
-      width: 30,
-      height: 30,
-      borderWidth: 1.5,
-      borderColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: spacing.sm,
-    },
-    headerAddGlyph: { fontSize: 20, fontWeight: "700", color: colors.accent, lineHeight: 22 },
     runButton: { borderWidth: 1, borderColor: colors.accent, paddingVertical: 6, paddingHorizontal: spacing.sm },
     runButtonPressed: { backgroundColor: colors.accent + "22" },
     runButtonDisabled: { borderColor: colors.border },

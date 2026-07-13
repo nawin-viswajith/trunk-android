@@ -14,12 +14,14 @@ export interface EngineParams {
 const LITE_MODE_THREADS = 2;
 
 // llama.cpp's own convention for "offload every layer" — used only once NPU
-// acceleration is actually enabled and detected; otherwise nGpuLayers stays
-// at its existing default of 0 (CPU-only), unchanged from before this offload
-// path existed.
+// or GPU acceleration is actually enabled and detected; otherwise nGpuLayers
+// stays at its existing default of 0 (CPU-only), unchanged from before either
+// offload path existed.
 const NPU_ALL_LAYERS = 99;
+const GPU_ALL_LAYERS = 99;
 
 let cachedNpuDevices: string[] | null = null;
+let cachedGpuDevices: string[] | null = null;
 
 /** Queries llama.rn's backend device list once per process (the set of
  * available devices doesn't change while the app is running) and returns
@@ -38,6 +40,27 @@ export async function detectNpuDevices(): Promise<string[]> {
     cachedNpuDevices = [];
   }
   return cachedNpuDevices;
+}
+
+/** Same idea as detectNpuDevices, for the OpenCL GPU backend instead of
+ * Hexagon — llama.rn's OpenCL support is scoped to Qualcomm Adreno 700+
+ * GPUs (see its README), and the native device list reports the real
+ * driver-reported GPU name (e.g. "QUALCOMM Adreno(TM) 730"), not a fixed
+ * string the way HTP devices are, so this matches on "adreno" rather than
+ * a prefix. */
+export async function detectGpuDevices(): Promise<string[]> {
+  if (cachedGpuDevices) return cachedGpuDevices;
+  if (Platform.OS !== "android") {
+    cachedGpuDevices = [];
+    return cachedGpuDevices;
+  }
+  try {
+    const devices = await getBackendDevicesInfo();
+    cachedGpuDevices = devices.filter((d) => /adreno/i.test(d.deviceName)).map((d) => d.deviceName);
+  } catch {
+    cachedGpuDevices = [];
+  }
+  return cachedGpuDevices;
 }
 
 export interface ActiveDeviceInfo {
@@ -61,10 +84,8 @@ export function getActiveDeviceInfo(): ActiveDeviceInfo | null {
 
 /** Short label for whichever unit the currently-loaded context is actually
  * running on — "CPU" if nothing's loaded yet or no offload engaged, else
- * "NPU"/"GPU" from llama.rn's reported device list. The app's only current
- * offload path is Hexagon HTP, so in practice this only ever says NPU, but
- * it's derived from the real device name rather than hardcoded so it stays
- * correct if another backend (e.g. OpenCL GPU) is ever wired up too. */
+ * "NPU"/"GPU" derived from llama.rn's reported device list (HTP* means NPU,
+ * anything else reported while gpu=true means the OpenCL/Adreno path). */
 export function getActiveInferenceUnit(): string {
   const info = activeDeviceInfo;
   if (!info || !info.gpu || info.devices.length === 0) return "CPU";
@@ -101,6 +122,7 @@ let activeModelPath: string | null = null;
 let activeThreads: number | undefined;
 let activeContextLength: number | undefined;
 let activeNpuRequested: boolean | undefined;
+let activeGpuRequested: boolean | undefined;
 
 // The native context is a single shared singleton, but callers (Inference
 // chat, Flow runs, Craft-with-AI, benchmarking) live on screens that all
@@ -125,18 +147,25 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
     const npuRequested = useSettingsStore.getState().npuAcceleration;
     const npuDevices = npuRequested ? await detectNpuDevices() : [];
     const npuActive = npuDevices.length > 0;
+    // NPU wins if both happen to be requested at once — combining them
+    // (true hybrid offload) is its own future mode, not something this
+    // toggle pair falls into by accident.
+    const gpuRequested = !npuActive && useSettingsStore.getState().gpuAcceleration;
+    const gpuDevices = gpuRequested ? await detectGpuDevices() : [];
+    const gpuActive = gpuDevices.length > 0;
 
-    // Thread count, context length, and NPU offload are all fixed at load
-    // time by initLlama — toggling Lite Mode or NPU Acceleration, or
-    // changing a project/flow's context length, while this exact model is
-    // already loaded must force a reload, or the change would silently
+    // Thread count, context length, and NPU/GPU offload are all fixed at
+    // load time by initLlama — toggling Lite Mode, NPU, or GPU acceleration,
+    // or changing a project/flow's context length, while this exact model
+    // is already loaded must force a reload, or the change would silently
     // never take effect until a different model was picked.
     if (
       activeModelPath === modelPath &&
       activeContext &&
       activeThreads === effectiveThreads &&
       activeContextLength === params.contextLength &&
-      activeNpuRequested === npuRequested
+      activeNpuRequested === npuRequested &&
+      activeGpuRequested === gpuRequested
     ) {
       return;
     }
@@ -151,13 +180,17 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
       model: modelPath,
       n_ctx: params.contextLength,
       n_threads: effectiveThreads,
-      n_gpu_layers: params.nGpuLayers ?? (npuActive ? NPU_ALL_LAYERS : 0),
+      n_gpu_layers: params.nGpuLayers ?? (npuActive ? NPU_ALL_LAYERS : gpuActive ? GPU_ALL_LAYERS : 0),
+      // OpenCL (GPU) has no device-selection param — it's used automatically
+      // once n_gpu_layers > 0 and no `devices` override is given, unlike
+      // HTP which llama.rn requires naming explicitly.
       ...(npuActive ? { devices: ["HTP*"] } : {}),
     });
     activeModelPath = modelPath;
     activeThreads = effectiveThreads;
     activeContextLength = params.contextLength;
     activeNpuRequested = npuRequested;
+    activeGpuRequested = gpuRequested;
     activeDeviceInfo = {
       gpu: activeContext.gpu,
       devices: activeContext.devices ?? [],
@@ -174,6 +207,7 @@ export async function releaseEngine(): Promise<void> {
       activeModelPath = null;
       activeContextLength = undefined;
       activeNpuRequested = undefined;
+      activeGpuRequested = undefined;
       activeDeviceInfo = null;
     }
   });

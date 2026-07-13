@@ -15,11 +15,11 @@ import { useProjectStore } from "./src/state/useProjectStore";
 import { useAppFonts } from "./src/theme/fonts";
 import { showAlert } from "./src/state/useAlertStore";
 import { isBatteryOptimizationExempt, requestBatteryOptimizationExemption } from "./src/services/batteryOptimization";
+import { FEEDBACK_FORM_URL } from "./src/copy/links";
+import { captureSessionVisibilityFlags } from "./src/state/sessionFlags";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-// User-provided form link — not a guessed URL.
-const FEEDBACK_FORM_URL = "https://forms.cloud.microsoft/r/ZetxpjPEkA";
 const FEEDBACK_USAGE_THRESHOLD_MS = 10 * 60 * 1000;
 const USAGE_TICK_MS = 15000;
 
@@ -83,6 +83,7 @@ function AppInner() {
       if (settled) return;
       if (!useSettingsStore.persist.hasHydrated() || !useProjectStore.persist.hasHydrated()) return;
       settled = true;
+      captureSessionVisibilityFlags();
       const remaining = Math.max(0, minDuration - (Date.now() - start));
       setTimeout(() => setBootDone(true), remaining);
     };

@@ -38,6 +38,13 @@ interface SettingsState {
    * Silently has no effect on unsupported hardware; see detectNpuDevices in
    * llamaEngine.ts. Defaults off since it's unverified on most devices. */
   npuAcceleration: boolean;
+  /** Offloads inference to the Adreno GPU via OpenCL when llama.rn detects
+   * one — scoped to Qualcomm Adreno 700+ (see llama.rn's OpenCL section),
+   * and mutually exclusive with NPU in practice (see ensureLoaded in
+   * llamaEngine.ts — NPU wins if both are somehow on; combining them is a
+   * future hybrid mode, not this toggle pair). Defaults off for the same
+   * reason NPU does — unverified on most devices. */
+  gpuAcceleration: boolean;
   /** true = Urbanist (see theme/fonts.ts), false = platform default system font. */
   useCustomFont: boolean;
   /** Once true, the hidden theme picker stays visible in Settings forever —
@@ -66,6 +73,7 @@ interface SettingsState {
   setMobileDataDownloads: (pref: MobileDataDownloadPref) => void;
   setLiteMode: (value: boolean) => void;
   setNpuAcceleration: (value: boolean) => void;
+  setGpuAcceleration: (value: boolean) => void;
   setUseCustomFont: (value: boolean) => void;
   unlockSecretThemes: () => void;
   unlockDeveloperMode: () => void;
@@ -95,6 +103,7 @@ export const useSettingsStore = create<SettingsState>()(
       mobileDataDownloads: "ask",
       liteMode: false,
       npuAcceleration: false,
+      gpuAcceleration: false,
       useCustomFont: true,
       secretThemesUnlocked: false,
       developerModeUnlocked: false,
@@ -117,6 +126,7 @@ export const useSettingsStore = create<SettingsState>()(
       setMobileDataDownloads: (pref) => set({ mobileDataDownloads: pref }),
       setLiteMode: (value) => set({ liteMode: value }),
       setNpuAcceleration: (value) => set({ npuAcceleration: value }),
+      setGpuAcceleration: (value) => set({ gpuAcceleration: value }),
       setUseCustomFont: (value) => set({ useCustomFont: value }),
       unlockSecretThemes: () => set({ secretThemesUnlocked: true }),
       unlockDeveloperMode: () => set({ developerModeUnlocked: true }),

@@ -6,6 +6,7 @@ import { ThemeModeSection, ColorPaletteSection } from "../../components/Appearan
 import { ColorPalette, SecretThemeId, SECRET_THEMES, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
+import { wasSecretThemesUnlockedAtBoot } from "../../state/sessionFlags";
 import { createScreenStyles } from "../../theme/layout";
 
 export function AppearanceSettingsScreen() {
@@ -23,6 +24,11 @@ export function AppearanceSettingsScreen() {
     setSecretTheme("none");
     setSecretThemesUnlocked(false);
   };
+
+  // OR'd with the boot-time snapshot so turning the toggle off doesn't hide
+  // the whole card mid-session — it still takes effect for the next launch
+  // (see sessionFlags.ts). The Switch itself still reflects the live value.
+  const showSecretThemesCard = secretThemesUnlocked || wasSecretThemesUnlockedAtBoot();
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -54,7 +60,7 @@ export function AppearanceSettingsScreen() {
         <ColorPaletteSection />
       </Card>
 
-      {secretThemesUnlocked ? (
+      {showSecretThemesCard ? (
         <Card>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Secret Themes</Text>
@@ -120,7 +126,7 @@ function createStyles(colors: ColorPalette) {
     content: { padding: spacing.md },
     sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: spacing.sm },
     sectionHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm, textAlign: "justify" },
+    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
     themeRow: { flexDirection: "row", gap: spacing.sm },
     themeChip: { flex: 1, borderWidth: 1, borderColor: colors.border, paddingVertical: spacing.sm, alignItems: "center" },
     themeChipActive: { borderColor: colors.accent, backgroundColor: colors.accent + "22" },

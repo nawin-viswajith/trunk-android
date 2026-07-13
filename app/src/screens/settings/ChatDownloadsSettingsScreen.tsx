@@ -68,7 +68,7 @@ function createStyles(colors: ColorPalette) {
     container: screen.container,
     content: { padding: spacing.md },
     sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600", marginBottom: spacing.sm },
-    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm, textAlign: "justify" },
+    hint: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
     toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
     toggleTextWrap: { flex: 1 },
     toggleLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: "600", marginBottom: 2 },

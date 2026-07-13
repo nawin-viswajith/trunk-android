@@ -69,7 +69,7 @@ function createStyles(colors: ColorPalette) {
       gap: spacing.sm,
     },
     title: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", marginBottom: spacing.xs },
-    hint: { color: colors.textSecondary, fontSize: 12, lineHeight: 17, textAlign: "justify" },
+    hint: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
     row: {
       flexDirection: "row",
       justifyContent: "space-between",
@@ -81,7 +81,7 @@ function createStyles(colors: ColorPalette) {
     },
     quantLabel: { color: colors.accent, fontSize: 13, fontWeight: "700", fontFamily: "monospace" },
     quantValue: { color: colors.textPrimary, fontSize: 13, fontWeight: "600" },
-    note: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, textAlign: "justify" },
+    note: { color: colors.textSecondary, fontSize: 11, lineHeight: 16 },
     buttonRow: { marginTop: spacing.sm },
   });
 }

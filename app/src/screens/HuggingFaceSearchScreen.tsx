@@ -110,7 +110,7 @@ function createStyles(colors: ColorPalette) {
   const screen = createScreenStyles(colors);
   return StyleSheet.create({
     container: { ...screen.container, padding: spacing.md },
-    subtitle: { color: colors.textSecondary, fontSize: 12, marginBottom: spacing.md, textAlign: "justify" },
+    subtitle: { color: colors.textSecondary, fontSize: 12, marginBottom: spacing.md },
     sectionLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "700", textTransform: "uppercase", marginBottom: spacing.xs },
     searchRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.md },
     input: {
