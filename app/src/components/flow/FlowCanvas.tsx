@@ -107,6 +107,12 @@ interface FlowCanvasProps {
   onConnect: (sourceId: string, targetId: string) => void;
   onRemoveConnection: (sourceId: string) => void;
   onNodeLongPress: (nodeId: string) => void;
+  /** Fired whenever the visible viewport (its on-screen size, or the pan
+   * offset moving it) changes — lets the caller compute "the canvas-space
+   * point currently at the center of the screen" for placing a new node
+   * where the user is actually looking, instead of a fixed canvas-space
+   * origin that can be scrolled far out of view. */
+  onViewportChange?: (info: { offset: Point; width: number; height: number }) => void;
 }
 
 /** The last node reached walking forward from the start node — used to
@@ -134,12 +140,21 @@ function findEndNodeId(flow: Flow): string | null {
  * priority over the background pan when a touch starts on a node — no
  * explicit Race/Exclusive composition needed between node-drag and
  * background-pan. */
-export function FlowCanvas({ flow, agents, onMoveNode, onConnect, onRemoveConnection, onNodeLongPress }: FlowCanvasProps) {
+export function FlowCanvas({
+  flow,
+  agents,
+  onMoveNode,
+  onConnect,
+  onRemoveConnection,
+  onNodeLongPress,
+  onViewportChange,
+}: FlowCanvasProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const endNodeId = useMemo(() => findEndNodeId(flow), [flow]);
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const offsetStart = useRef({ x: 0, y: 0 });
+  const viewportSize = useRef({ width: 0, height: 0 });
   const [pendingSource, setPendingSource] = useState<string | null>(null);
   // While a node is being dragged, its FlowNodeView keeps the buttery-smooth
   // visual offset locally — this just mirrors the live absolute position so
@@ -147,12 +162,18 @@ export function FlowCanvas({ flow, agents, onMoveNode, onConnect, onRemoveConnec
   // place only after the drag ends.
   const [liveDrag, setLiveDrag] = useState<{ id: string; x: number; y: number } | null>(null);
 
+  const reportViewport = (offset: Point) => {
+    onViewportChange?.({ offset, width: viewportSize.current.width, height: viewportSize.current.height });
+  };
+
   const backgroundPan = Gesture.Pan()
     .onBegin(() => {
       offsetStart.current = canvasOffset;
     })
     .onUpdate((e) => {
-      setCanvasOffset({ x: offsetStart.current.x + e.translationX, y: offsetStart.current.y + e.translationY });
+      const next = { x: offsetStart.current.x + e.translationX, y: offsetStart.current.y + e.translationY };
+      setCanvasOffset(next);
+      reportViewport(next);
     });
 
   const backgroundTap = Gesture.Tap().onEnd(() => setPendingSource(null));
@@ -189,7 +210,13 @@ export function FlowCanvas({ flow, agents, onMoveNode, onConnect, onRemoveConnec
 
   return (
     <GestureDetector gesture={backgroundGesture}>
-      <View style={styles.viewport}>
+      <View
+        style={styles.viewport}
+        onLayout={(e) => {
+          viewportSize.current = { width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height };
+          reportViewport(canvasOffset);
+        }}
+      >
         <View style={[styles.canvasContent, { transform: [{ translateX: canvasOffset.x }, { translateY: canvasOffset.y }] }]}>
           {/* Nodes render first (bottom), the connections SVG after (top) —
            * a "backward" connection (target left of source) has to tuck its
@@ -224,16 +251,23 @@ export function FlowCanvas({ flow, agents, onMoveNode, onConnect, onRemoveConnec
             ))}
           </Svg>
 
-          {connections.map((c) => (
-            <RemoveBadge
-              key={c.nodeId}
-              x={c.badge.x}
-              y={c.badge.y}
-              color={colors.accentTertiary}
-              badgeColor={colors.background}
-              onRemove={() => onRemoveConnection(c.nodeId)}
-            />
-          ))}
+          {/* Hidden while a connection is being made (pendingSource set): a
+           * badge sitting right at an existing connection's midpoint is an
+           * easy accidental tap while reaching for a different node's
+           * handle elsewhere on the canvas, silently deleting an unrelated
+           * connection instead of completing the new one. */}
+          {!pendingSource
+            ? connections.map((c) => (
+                <RemoveBadge
+                  key={c.nodeId}
+                  x={c.badge.x}
+                  y={c.badge.y}
+                  color={colors.accentTertiary}
+                  badgeColor={colors.background}
+                  onRemove={() => onRemoveConnection(c.nodeId)}
+                />
+              ))
+            : null}
         </View>
       </View>
     </GestureDetector>

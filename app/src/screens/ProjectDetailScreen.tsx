@@ -15,6 +15,7 @@ import { useProjectStore, selectProject, selectHistoryForProject, selectSessions
 import { listLocalModels, LocalModel, modelPath, isModelDownloaded } from "../services/modelStorage";
 import { benchmarkModel } from "../services/llamaEngine";
 import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../utils/inferenceParams";
+import { logFailure } from "../services/errorLog";
 
 export function ProjectDetailScreen({ route, navigation }: any) {
   const colors = useColors();
@@ -44,6 +45,13 @@ export function ProjectDetailScreen({ route, navigation }: any) {
   const [models, setModels] = useState<LocalModel[]>([]);
   const [benchmarking, setBenchmarking] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  // Distinct from a validation failure (which shows its own alert) - this is
+  // purely "your last Apply actually took effect," since the button gave no
+  // visible response at all before and a user had no way to tell a tap
+  // registered short of scrolling down to see if History behavior changed.
+  const [justApplied, setJustApplied] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
 
   const [temperature, setTemperature] = useState(String(project?.temperature ?? 0.7));
   const [topP, setTopP] = useState(String(project?.topP ?? 0.9));
@@ -106,11 +114,32 @@ export function ProjectDetailScreen({ route, navigation }: any) {
       return;
     }
     updateProject(projectId, parsed);
+    setJustApplied(true);
+    setTimeout(() => setJustApplied(false), 1800);
+  };
+
+  // Any edit after an Apply invalidates that confirmation immediately —
+  // otherwise "Applied" could still read as current after the user changed
+  // a field again without re-pressing Apply.
+  const onParamFieldChange = (setter: (v: string) => void) => (value: string) => {
+    setJustApplied(false);
+    setter(value);
   };
 
   const confirmDelete = () => {
     deleteProject(projectId);
     navigation.goBack();
+  };
+
+  const startRename = () => {
+    setRenameValue(project?.name ?? "");
+    setRenaming(true);
+  };
+
+  const saveRename = () => {
+    const trimmed = renameValue.trim();
+    if (trimmed) updateProject(projectId, { name: trimmed });
+    setRenaming(false);
   };
 
   const runBenchmark = async () => {
@@ -128,6 +157,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
           `${result.tokens} tokens @ ${result.tokensPerSecond.toFixed(1)} tok/s`
       );
     } catch (err) {
+      logFailure("Benchmark", err);
       showAlert("Benchmark failed", `The model failed to load or generate:\n\n${String(err)}`);
     } finally {
       setBenchmarking(false);
@@ -138,7 +168,26 @@ export function ProjectDetailScreen({ route, navigation }: any) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>{project.name}</Text>
+      {renaming ? (
+        <View style={styles.renameRow}>
+          <TextInput
+            value={renameValue}
+            onChangeText={setRenameValue}
+            style={styles.renameInput}
+            autoFocus
+            onSubmitEditing={saveRename}
+          />
+          <Button label="Save" onPress={saveRename} variant="secondary" />
+          <Button label="Cancel" onPress={() => setRenaming(false)} variant="neutral" />
+        </View>
+      ) : (
+        <Pressable onPress={startRename} style={styles.titleRow}>
+          <Text style={styles.title} numberOfLines={1}>
+            {project.name}
+          </Text>
+          <Text style={styles.renameHint}>Rename ›</Text>
+        </Pressable>
+      )}
 
       <Card>
         <View style={styles.modelHeaderRow}>
@@ -184,25 +233,45 @@ export function ProjectDetailScreen({ route, navigation }: any) {
         <Text style={styles.sectionTitle}>Inference Parameters</Text>
         <View style={styles.paramRow}>
           <Text style={styles.paramLabel}>Temperature</Text>
-          <TextInput value={temperature} onChangeText={setTemperature} keyboardType="decimal-pad" style={styles.paramInput} />
+          <TextInput
+            value={temperature}
+            onChangeText={onParamFieldChange(setTemperature)}
+            keyboardType="decimal-pad"
+            style={styles.paramInput}
+          />
         </View>
         <View style={styles.paramRow}>
           <Text style={styles.paramLabel}>Top P</Text>
-          <TextInput value={topP} onChangeText={setTopP} keyboardType="decimal-pad" style={styles.paramInput} />
+          <TextInput value={topP} onChangeText={onParamFieldChange(setTopP)} keyboardType="decimal-pad" style={styles.paramInput} />
         </View>
         <View style={styles.paramRow}>
           <Text style={styles.paramLabel}>Top K</Text>
-          <TextInput value={topK} onChangeText={setTopK} keyboardType="number-pad" style={styles.paramInput} />
+          <TextInput value={topK} onChangeText={onParamFieldChange(setTopK)} keyboardType="number-pad" style={styles.paramInput} />
         </View>
         <View style={styles.paramRow}>
           <Text style={styles.paramLabel}>Context length</Text>
-          <TextInput value={contextLength} onChangeText={setContextLength} keyboardType="number-pad" style={styles.paramInput} />
+          <TextInput
+            value={contextLength}
+            onChangeText={onParamFieldChange(setContextLength)}
+            keyboardType="number-pad"
+            style={styles.paramInput}
+          />
         </View>
         <View style={styles.paramRow}>
           <Text style={styles.paramLabel}>Max tokens</Text>
-          <TextInput value={maxTokens} onChangeText={setMaxTokens} keyboardType="number-pad" style={styles.paramInput} />
+          <TextInput
+            value={maxTokens}
+            onChangeText={onParamFieldChange(setMaxTokens)}
+            keyboardType="number-pad"
+            style={styles.paramInput}
+          />
         </View>
-        <Button label="Apply Parameters" onPress={applyParams} variant="secondary" />
+        <Button
+          label={justApplied ? "Applied ✓" : "Apply Parameters"}
+          onPress={applyParams}
+          variant={justApplied ? "primary" : "secondary"}
+          disabled={justApplied}
+        />
       </Card>
 
       <Card>
@@ -246,7 +315,21 @@ function createStyles(colors: ColorPalette) {
   return StyleSheet.create({
     container: screen.container,
     content: { padding: spacing.md, gap: spacing.sm },
-    title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700", marginBottom: spacing.md },
+    title: { color: colors.textPrimary, fontSize: 20, fontWeight: "700", flexShrink: 1 },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md },
+    renameHint: { color: colors.accentSecondary, fontSize: 12, fontWeight: "600" },
+    renameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.md },
+    renameInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.accent,
+      color: colors.textPrimary,
+      backgroundColor: colors.surfaceAlt,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      fontSize: 16,
+      fontWeight: "700",
+    },
     sectionTitle: { color: colors.textPrimary, fontSize: 14, fontWeight: "600" },
     backButton: { paddingHorizontal: spacing.sm },
     backButtonLabel: { color: colors.accent, fontSize: 28, fontWeight: "700" },

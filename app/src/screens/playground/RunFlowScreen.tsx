@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { TextInput } from "../../components/TextInput";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Button } from "../../components/Button";
 import { MarkdownText } from "../../components/MarkdownText";
-import { TypingDots } from "../../components/TypingDots";
 import { ContextWindowMeter } from "../../components/ContextWindowMeter";
 import { AttachmentChip } from "../../components/AttachmentChip";
+import { FlowStepsAccordion } from "../../components/FlowStepsAccordion";
 import { runFlow, FlowProgress, FlowStepResult } from "../../services/flowRunner";
 import { selectFlow, useFlowStore } from "../../state/useFlowStore";
-import { ensureLoaded, countTokens } from "../../services/llamaEngine";
+import { ensureLoaded, countTokens, getActiveInferenceUnit } from "../../services/llamaEngine";
 import { modelPath } from "../../services/modelStorage";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../../services/fileAttachment";
+import { logFailure } from "../../services/errorLog";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
@@ -36,7 +37,8 @@ export function RunFlowScreen({ route, navigation }: any) {
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
   const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
-  const listRef = useRef<FlatList<FlowStepResult>>(null);
+  const [inferenceUnit, setInferenceUnit] = useState<string | null>(null);
+  const listRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     // Same approach as InferenceScreen: tab bar hides on keyboard
@@ -57,7 +59,9 @@ export function RunFlowScreen({ route, navigation }: any) {
   // a cheap no-op via ensureLoaded's singleton reuse if already loaded.
   useEffect(() => {
     if (flow?.modelFilename) {
-      ensureLoaded(modelPath(flow.modelFilename), { contextLength: flow.contextLength }).catch(() => {});
+      ensureLoaded(modelPath(flow.modelFilename), { contextLength: flow.contextLength })
+        .then(() => setInferenceUnit(getActiveInferenceUnit()))
+        .catch(() => {});
     }
   }, [flow?.modelFilename, flow?.contextLength]);
 
@@ -118,6 +122,7 @@ export function RunFlowScreen({ route, navigation }: any) {
       );
       setFinalResult(result);
     } catch (err) {
+      logFailure("Playground flow run", err);
       setError(String(err));
     } finally {
       setRunning(false);
@@ -136,61 +141,43 @@ export function RunFlowScreen({ route, navigation }: any) {
         </Text>
       </View>
 
-      <FlatList
+      <ScrollView
         ref={listRef}
         style={styles.list}
         contentContainerStyle={styles.listContent}
-        data={steps}
-        keyExtractor={(item) => item.nodeId}
-        renderItem={({ item, index }) => (
-          <View style={styles.stepCard}>
-            <Text style={styles.stepBadge}>
-              {index + 1}. {item.agentName}
-            </Text>
-            <MarkdownText content={item.output} textStyle={styles.stepText} />
-            <Text style={styles.stepMeta}>
-              {item.stats.tokens} tok · {item.stats.tokensPerSecond.toFixed(1)} tok/s
-            </Text>
-            <ContextWindowMeter usedTokens={item.stats.promptTokens} maxTokens={flow.contextLength} label="This step" />
+        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+      >
+        {steps.length === 0 && !running ? (
+          <View style={styles.emptyWrap}>
+            <Text style={styles.emptyTitle}>Ready to run</Text>
+            <Text style={styles.emptySubtitle}>Enter an input below to start the chain.</Text>
           </View>
-        )}
-        ListEmptyComponent={
-          !running ? (
-            <View style={styles.emptyWrap}>
-              <Text style={styles.emptyTitle}>Ready to run</Text>
-              <Text style={styles.emptySubtitle}>Enter an input below to start the chain.</Text>
-            </View>
-          ) : null
-        }
-        ListFooterComponent={
-          activeStep ? (
-            <View style={styles.stepCard}>
-              <Text style={styles.stepBadge}>
-                {steps.length + 1}. {activeStep.agentName} — working...
-              </Text>
-              {activeStep.partialText ? (
-                <MarkdownText content={activeStep.partialText} textStyle={styles.stepText} />
-              ) : (
-                <TypingDots />
-              )}
-            </View>
-          ) : finalResult ? (
-            <View style={styles.finalCard}>
-              <Text style={styles.finalBadge}>FINAL RESULT</Text>
-              <MarkdownText content={finalResult} textStyle={styles.finalText} />
-            </View>
-          ) : error ? (
-            <View style={styles.finalCard}>
-              <Text style={styles.errorBadge}>ERROR</Text>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null
-        }
-      />
+        ) : null}
+
+        {/* Every intermediate agent collapsed by default — only the final
+         * result (below) is meant to be read at a glance; these are the
+         * "show your work" steps behind it. */}
+        <FlowStepsAccordion
+          steps={steps.map((s) => ({ id: s.nodeId, agentName: s.agentName, output: s.output, tokensPerSecond: s.stats.tokensPerSecond }))}
+          activeStep={activeStep ? { agentName: activeStep.agentName, partialText: activeStep.partialText } : null}
+        />
+
+        {finalResult ? (
+          <View style={styles.finalCard}>
+            <Text style={styles.finalBadge}>FINAL RESULT</Text>
+            <MarkdownText content={finalResult} textStyle={styles.finalText} />
+          </View>
+        ) : error ? (
+          <View style={styles.finalCard}>
+            <Text style={styles.errorBadge}>ERROR</Text>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+      </ScrollView>
 
       <View style={styles.composer}>
         {flow.contextLength ? (
-          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={flow.contextLength} label="Next input" />
+          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={flow.contextLength} unit={inferenceUnit ?? undefined} />
         ) : null}
         {attachment ? (
           <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />
@@ -198,7 +185,7 @@ export function RunFlowScreen({ route, navigation }: any) {
         {attachError ? <Text style={styles.attachErrorText}>{attachError}</Text> : null}
         <View style={styles.inputRow}>
           <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
-            <Text style={styles.attachButtonLabel}>+File</Text>
+            <Text style={styles.attachButtonLabel}>📎</Text>
           </Pressable>
           <TextInput
             value={input}
@@ -283,7 +270,7 @@ function createStyles(colors: ColorPalette) {
       paddingHorizontal: spacing.sm,
       paddingVertical: spacing.sm,
     },
-    attachButtonLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
+    attachButtonLabel: { color: colors.textSecondary, fontSize: 18 },
     input: {
       flex: 1,
       borderWidth: 1,

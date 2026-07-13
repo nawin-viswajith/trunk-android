@@ -53,13 +53,24 @@ export function PerformanceSettingsScreen() {
 
   const onToggleNpuAcceleration = (value: boolean) => {
     setNpuAcceleration(value);
-    if (value) {
+    if (!value) return;
+    // detectNpuDevices() has already run once (see the focus effect above),
+    // so the actual per-device answer is known by the time this fires —
+    // no reason to give the same generic "may not work" note to a device
+    // that has already, concretely, been found to lack the chipset.
+    if (npuDevices !== null && npuDevices.length === 0) {
       showAlert(
-        "NPU Acceleration enabled",
-        "Experimental. Only tested on Qualcomm Snapdragon 8 Gen 1 and newer, and best suited to models under 4B parameters. Takes effect the next time a model loads, and silently falls back to CPU on unsupported hardware.",
+        "No NPU detected on this device",
+        "This device's chipset doesn't have a supported Hexagon NPU (Qualcomm Snapdragon 8 Gen 1 or newer only). Turning this on will have no effect — inference will keep running on CPU.",
         [{ label: "OK" }]
       );
+      return;
     }
+    showAlert(
+      "NPU Acceleration enabled",
+      "Experimental. Best suited to models under 4B parameters. Takes effect the next time a model loads.",
+      [{ label: "OK" }]
+    );
   };
 
   return (

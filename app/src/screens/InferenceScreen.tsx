@@ -19,13 +19,15 @@ import {
   selectSessionsForProject,
 } from "../state/useProjectStore";
 import { modelPath, isModelDownloaded } from "../services/modelStorage";
-import { ensureLoaded, complete, countTokens } from "../services/llamaEngine";
-import { runFlow } from "../services/flowRunner";
+import { ensureLoaded, complete, countTokens, getActiveInferenceUnit } from "../services/llamaEngine";
+import { runFlow, FlowStepResult } from "../services/flowRunner";
+import { FlowStepsAccordion } from "../components/FlowStepsAccordion";
 import { useFlowStore } from "../state/useFlowStore";
 import { formatInferenceStats } from "../utils/format";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { showAlert } from "../state/useAlertStore";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../services/fileAttachment";
+import { logFailure } from "../services/errorLog";
 
 interface ChatMessage {
   id: string;
@@ -118,6 +120,16 @@ export function InferenceScreen({ route, navigation }: any) {
   // native error afterward. 0 while nothing loaded/nothing typed yet.
   const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  // Null until a model has actually finished loading at least once — shown
+  // next to the composer so it's visible before the user sends anything,
+  // not just discoverable after the fact from response speed.
+  const [inferenceUnit, setInferenceUnit] = useState<string | null>(null);
+  // Live per-agent breakdown for the flow run currently in flight - cleared
+  // at the start of every send() and once the exchange settles, matching
+  // Playground's Run screen (steps are a "watch it work" view of the
+  // current run, not a persisted part of chat history).
+  const [flowSteps, setFlowSteps] = useState<FlowStepResult[]>([]);
+  const [activeFlowStep, setActiveFlowStep] = useState<{ agentName: string; partialText: string } | null>(null);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
   useEffect(() => {
@@ -227,6 +239,28 @@ export function InferenceScreen({ route, navigation }: any) {
       ]);
   }, [history, activeSessionId]);
 
+  // Preload the project's model as soon as it's selected, not only once the
+  // first message is actually sent — otherwise the live token estimate
+  // below silently reads 0 for that entire first message (countTokens needs
+  // a loaded context), and the inference-unit indicator has nothing to show
+  // until after a full round-trip. Direct-chat only; a Flow's model loads
+  // inside runFlow itself once Run is pressed.
+  useEffect(() => {
+    if (activeFlow || !activeProject?.modelFilename) return;
+    let cancelled = false;
+    isModelDownloaded(activeProject.modelFilename).then((downloaded) => {
+      if (!downloaded || cancelled) return;
+      ensureLoaded(modelPath(activeProject.modelFilename!), { contextLength: activeProject.contextLength })
+        .then(() => {
+          if (!cancelled) setInferenceUnit(getActiveInferenceUnit());
+        })
+        .catch(() => {});
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFlow, activeProject?.modelFilename, activeProject?.contextLength]);
+
   useEffect(() => {
     if (activeFlow || !activeProject?.modelFilename) {
       setLiveTokenEstimate(0);
@@ -269,13 +303,24 @@ export function InferenceScreen({ route, navigation }: any) {
     setAttachment(null);
     setPendingExchange({ sessionId, prompt: trimmedPrompt, output: "" });
     setRunning(true);
+    setFlowSteps([]);
+    setActiveFlowStep(null);
     try {
       const messageContent = currentAttachment
         ? `${formatAttachmentForPrompt(currentAttachment)}\n\n${trimmedPrompt}`
         : trimmedPrompt;
 
       if (activeFlow) {
-        const result = await runFlow(activeFlow, agents, messageContent, () => {});
+        const result = await runFlow(
+          activeFlow,
+          agents,
+          messageContent,
+          (step) => {
+            setFlowSteps((cur) => [...cur, step]);
+            setActiveFlowStep(null);
+          },
+          (progress) => setActiveFlowStep({ agentName: progress.agentName, partialText: progress.partialText })
+        );
         addHistoryEntry({
           projectId: activeProject.id,
           sessionId,
@@ -298,6 +343,7 @@ export function InferenceScreen({ route, navigation }: any) {
       }
 
       await ensureLoaded(modelPath(activeProject.modelFilename), { contextLength: activeProject.contextLength });
+      setInferenceUnit(getActiveInferenceUnit());
 
       let fullText = "";
       const result = await complete(
@@ -326,10 +372,12 @@ export function InferenceScreen({ route, navigation }: any) {
         totalMs: result.totalMs,
       });
     } catch (err) {
+      logFailure(activeFlow ? "Inference (via Flow)" : "Inference", err);
       showAlert("Inference error", String(err));
     } finally {
       setRunning(false);
       setPendingExchange(null);
+      setActiveFlowStep(null);
     }
   }, [activeProject, activeSessionId, activeFlow, agents, prompt, attachment, priorTurns, addHistoryEntry]);
 
@@ -462,11 +510,24 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.empty}>Send a prompt to start chatting with this project's model.</Text>
           )
         }
+        ListFooterComponent={
+          activeFlow && (flowSteps.length > 0 || activeFlowStep) ? (
+            <FlowStepsAccordion
+              steps={flowSteps.map((s) => ({
+                id: s.nodeId,
+                agentName: s.agentName,
+                output: s.output,
+                tokensPerSecond: s.stats.tokensPerSecond,
+              }))}
+              activeStep={activeFlowStep}
+            />
+          ) : null
+        }
       />
 
       <View style={styles.composer}>
         {!activeFlow && activeProject?.contextLength ? (
-          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={activeProject.contextLength} label="Next message" />
+          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={activeProject.contextLength} unit={inferenceUnit ?? undefined} />
         ) : null}
         {attachment ? (
           <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />
@@ -474,7 +535,7 @@ export function InferenceScreen({ route, navigation }: any) {
         {attachError ? <Text style={styles.attachError}>{attachError}</Text> : null}
         <View style={styles.promptRow}>
           <Pressable onPress={onPickAttachment} disabled={running} style={styles.attachButton}>
-            <Text style={styles.attachButtonLabel}>+File</Text>
+            <Text style={styles.attachButtonLabel}>📎</Text>
           </Pressable>
           <TextInput
             value={prompt}
@@ -542,7 +603,7 @@ function createStyles(colors: ColorPalette) {
       justifyContent: "center",
       paddingHorizontal: spacing.sm,
     },
-    attachButtonLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
+    attachButtonLabel: { color: colors.textSecondary, fontSize: 18 },
     input: {
       flex: 1,
       borderWidth: 1,

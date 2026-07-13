@@ -8,6 +8,7 @@ import { ColorPalette, DEFAULT_ACCENT_PRESET, spacing } from "../../theme/colors
 import { useColors, useThemeScheme } from "../../theme/ThemeContext";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { PERFORMANCE_DISCLAIMER } from "../../copy/disclaimers";
+import { detectNpuDevices } from "../../services/llamaEngine";
 
 const SLIDES = [
   {
@@ -39,7 +40,21 @@ export function OnboardingFlow() {
   const setAccentPreset = useSettingsStore((s) => s.setAccentPreset);
   const showInferenceStats = useSettingsStore((s) => s.showInferenceStats);
   const setShowInferenceStats = useSettingsStore((s) => s.setShowInferenceStats);
+  const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
+  const setNpuAcceleration = useSettingsStore((s) => s.setNpuAcceleration);
   const setHasOnboarded = useSettingsStore((s) => s.setHasOnboarded);
+  const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (phase !== "setup") return;
+    let cancelled = false;
+    detectNpuDevices().then((devices) => {
+      if (!cancelled) setNpuDevices(devices);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [phase]);
 
   // Suggest a palette that matches the resolved scheme, but only until the
   // user actually picks one themselves (tracked by still being on the
@@ -135,6 +150,28 @@ export function OnboardingFlow() {
               <Switch
                 value={showInferenceStats}
                 onValueChange={setShowInferenceStats}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.textPrimary}
+              />
+            </View>
+
+            <Text style={[styles.sectionTitle, styles.sectionTitleSpaced]}>Inference Unit</Text>
+            <Text style={styles.text}>
+              {npuDevices === null
+                ? "Checking this device's chipset…"
+                : npuDevices.length > 0
+                  ? "A supported Hexagon NPU was found on this device — inference can run on it instead of the CPU."
+                  : "No supported Hexagon NPU was found on this device (Qualcomm Snapdragon 8 Gen 1 or newer only) — inference will run on CPU either way."}
+            </Text>
+            <View style={styles.toggleRow}>
+              <View style={styles.toggleTextWrap}>
+                <Text style={styles.toggleLabel}>Use NPU when available</Text>
+                <Text style={styles.toggleHint}>Experimental. Best suited to models under 4B parameters.</Text>
+              </View>
+              <Switch
+                value={npuAcceleration}
+                onValueChange={setNpuAcceleration}
+                disabled={npuDevices !== null && npuDevices.length === 0}
                 trackColor={{ false: colors.border, true: colors.accent }}
                 thumbColor={colors.textPrimary}
               />

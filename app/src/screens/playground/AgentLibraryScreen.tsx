@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { AgentCard } from "../../components/flow/AgentCard";
@@ -46,6 +46,17 @@ export function AgentLibraryScreen({ navigation, route }: any) {
     setEditingId(null);
     setEditorOpen(true);
   };
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <Pressable onPress={openCreate} hitSlop={12} style={({ pressed }) => [styles.headerAddButton, pressed && styles.headerAddButtonPressed]}>
+          <Text style={styles.headerAddGlyph}>+</Text>
+        </Pressable>
+      ),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, styles]);
 
   useEffect(() => {
     if (route?.params?.openCreate) {
@@ -116,11 +127,7 @@ export function AgentLibraryScreen({ navigation, route }: any) {
             <Text style={styles.deleteChipLabel}>Delete ({selectedIds.size})</Text>
           </Pressable>
         </View>
-      ) : (
-        <Pressable style={styles.fab} onPress={openCreate}>
-          <Text style={styles.fabLabel}>+</Text>
-        </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -136,18 +143,17 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    fab: {
-      position: "absolute",
-      right: spacing.md,
-      bottom: spacing.lg,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: colors.accent,
+    headerAddButton: {
+      width: 30,
+      height: 30,
+      borderWidth: 1.5,
+      borderColor: colors.accent,
       alignItems: "center",
       justifyContent: "center",
+      marginRight: spacing.sm,
     },
-    fabLabel: { color: colors.background, fontSize: 26, fontWeight: "700", lineHeight: 28 },
+    headerAddButtonPressed: { backgroundColor: colors.accent + "22" },
+    headerAddGlyph: { fontSize: 20, fontWeight: "700", color: colors.accent, lineHeight: 22 },
     selectionBar: {
       position: "absolute",
       left: 0,

@@ -97,6 +97,12 @@ export async function getSuggestedModelBudget(): Promise<SuggestedModelBudget | 
   };
 }
 
+// GB above 1024 MB so a figure like "10775 MB" reads as "10.5 GB" instead -
+// mirrors formatBytes' threshold in utils/format.ts, just MB-scaled input.
+function formatMb(mb: number): string {
+  return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(0)} MB`;
+}
+
 export async function checkCompatibility(fileSizeBytes: number): Promise<CompatibilityInfo> {
   const requiredMb = estimateRequiredMb(fileSizeBytes);
   const memory = await getDeviceMemory();
@@ -112,10 +118,12 @@ export async function checkCompatibility(fileSizeBytes: number): Promise<Compati
   }
 
   const category = categorize(requiredMb, memory.availableMb);
+  const needed = formatMb(requiredMb);
+  const available = formatMb(memory.availableMb);
   const messages: Record<Exclude<CompatibilityCategory, "unknown">, string> = {
-    supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB RAM available - comfortable fit.`,
-    can_bottleneck: `Estimated ~${requiredMb.toFixed(0)} MB needed, ${memory.availableMb.toFixed(0)} MB RAM available - will likely run but expect slowdowns or other apps getting closed.`,
-    not_supported: `Estimated ~${requiredMb.toFixed(0)} MB needed, only ${memory.availableMb.toFixed(0)} MB RAM available - likely to crash from out-of-memory.`,
+    supported: `Needs ~${needed} · ${available} RAM available - comfortable fit.`,
+    can_bottleneck: `Needs ~${needed} · ${available} RAM available - will likely run but expect slowdowns or other apps getting closed.`,
+    not_supported: `Needs ~${needed} · only ${available} RAM available - likely to crash from out-of-memory.`,
   };
 
   return {

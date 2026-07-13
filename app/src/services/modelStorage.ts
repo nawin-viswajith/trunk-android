@@ -62,6 +62,26 @@ export async function deleteLocalModel(filename: string): Promise<void> {
   await clearModelSource(filename);
 }
 
+/** Lets a downloaded model be copied out to a user-chosen folder (e.g. to
+ * back it up, or hand it to another app) — Android's scoped storage means
+ * the app's own model directory isn't visible to the user or other apps, so
+ * this is the only way out. Uses the native copyAsync between the app's
+ * file:// path and the chosen SAF destination rather than reading the whole
+ * (often multi-GB) file into a JS string, which would risk an OOM crash on
+ * a model of any real size. Returns false if the user cancelled the folder
+ * picker, true once the copy actually completes. */
+export async function exportModelToDevice(filename: string): Promise<boolean> {
+  const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+  if (!permissions.granted) return false;
+  const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+    permissions.directoryUri,
+    filename,
+    "application/octet-stream"
+  );
+  await FileSystem.StorageAccessFramework.copyAsync({ from: modelPath(filename), to: destUri });
+  return true;
+}
+
 const MODEL_SOURCES_KEY = "pocketcoder-model-sources";
 
 async function readModelSources(): Promise<Record<string, string>> {

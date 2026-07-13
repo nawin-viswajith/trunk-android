@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "../components/Text";
 import { TextInput } from "../components/TextInput";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -12,7 +13,14 @@ import { StatsBar } from "../components/StatsBar";
 import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
-import { deleteLocalModel, getTotalStorageUsed, importModelFromDevice, listLocalModels, LocalModel } from "../services/modelStorage";
+import {
+  deleteLocalModel,
+  exportModelToDevice,
+  getTotalStorageUsed,
+  importModelFromDevice,
+  listLocalModels,
+  LocalModel,
+} from "../services/modelStorage";
 import { formatBytes } from "../utils/format";
 import { fuzzyMatch } from "../utils/fuzzy";
 import { showAlert } from "../state/useAlertStore";
@@ -39,6 +47,7 @@ const GUIDE_STEPS: GuideStep[] = [
 
 export function ModelsScreen({ navigation }: any) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [models, setModels] = useState<LocalModel[]>([]);
   const [totalUsed, setTotalUsed] = useState(0);
@@ -50,6 +59,7 @@ export function ModelsScreen({ navigation }: any) {
   const [singleDeleteTarget, setSingleDeleteTarget] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [infoModel, setInfoModel] = useState<LocalModel | null>(null);
+  const [exporting, setExporting] = useState(false);
   const selectionMode = selectedNames.size > 0;
   const downloads = useDownloadStore((s) => s.downloads);
   const activeDownloads = Object.values(downloads);
@@ -85,6 +95,19 @@ export function ModelsScreen({ navigation }: any) {
     await deleteLocalModel(singleDeleteTarget);
     setSingleDeleteTarget(null);
     await load();
+  };
+
+  const exportModel = async () => {
+    if (!infoModel) return;
+    setExporting(true);
+    try {
+      const exported = await exportModelToDevice(infoModel.filename);
+      if (exported) showAlert("Model exported", `${infoModel.filename} was copied to the folder you chose.`);
+    } catch (err) {
+      showAlert("Export failed", String(err instanceof Error ? err.message : err));
+    } finally {
+      setExporting(false);
+    }
   };
 
   const toggleSelected = (filename: string) => {
@@ -127,7 +150,7 @@ export function ModelsScreen({ navigation }: any) {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Models" showActions guideSteps={GUIDE_STEPS} />
+      <ScreenHeader title="Models" showActions guideSteps={GUIDE_STEPS} onAddPress={() => setMenuOpen((v) => !v)} />
       <View style={styles.toolbar}>
         {models.length > 0 ? (
           <View style={styles.searchRow}>
@@ -213,7 +236,7 @@ export function ModelsScreen({ navigation }: any) {
 
       {menuOpen ? (
         <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)}>
-          <View style={styles.menu}>
+          <View style={[styles.menu, { top: insets.top + 60 }]}>
             <Pressable style={styles.menuItem} onPress={importModel}>
               <Text style={styles.menuItemLabel}>Import from Device</Text>
             </Pressable>
@@ -233,6 +256,8 @@ export function ModelsScreen({ navigation }: any) {
           if (infoModel) setSingleDeleteTarget(infoModel.filename);
           setInfoModel(null);
         }}
+        onExport={exportModel}
+        exporting={exporting}
       />
 
       <ConfirmModal
@@ -263,11 +288,7 @@ export function ModelsScreen({ navigation }: any) {
             <Text style={styles.deleteChipLabel}>Delete ({selectedNames.size})</Text>
           </Pressable>
         </View>
-      ) : (
-        <Pressable style={styles.fab} onPress={() => setMenuOpen((v) => !v)}>
-          <Text style={styles.fabLabel}>{menuOpen ? "×" : "+"}</Text>
-        </Pressable>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -324,18 +345,6 @@ function createStyles(colors: ColorPalette) {
     emptyWrap: { alignItems: "center", gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700", textAlign: "center" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
-    fab: {
-      position: "absolute",
-      right: spacing.md,
-      bottom: spacing.lg + 40,
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: colors.accent,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    fabLabel: { color: colors.background, fontSize: 26, fontWeight: "700", lineHeight: 28 },
     backdrop: {
       position: "absolute",
       top: 0,
@@ -346,7 +355,6 @@ function createStyles(colors: ColorPalette) {
     menu: {
       position: "absolute",
       right: spacing.md,
-      bottom: spacing.lg + 40 + 52 + spacing.sm,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,

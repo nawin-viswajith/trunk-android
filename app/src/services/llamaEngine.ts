@@ -59,6 +59,18 @@ export function getActiveDeviceInfo(): ActiveDeviceInfo | null {
   return activeDeviceInfo;
 }
 
+/** Short label for whichever unit the currently-loaded context is actually
+ * running on — "CPU" if nothing's loaded yet or no offload engaged, else
+ * "NPU"/"GPU" from llama.rn's reported device list. The app's only current
+ * offload path is Hexagon HTP, so in practice this only ever says NPU, but
+ * it's derived from the real device name rather than hardcoded so it stays
+ * correct if another backend (e.g. OpenCL GPU) is ever wired up too. */
+export function getActiveInferenceUnit(): string {
+  const info = activeDeviceInfo;
+  if (!info || !info.gpu || info.devices.length === 0) return "CPU";
+  return info.devices.some((d) => d.startsWith("HTP")) ? "NPU" : "GPU";
+}
+
 export interface CompletionParams {
   messages: { role: "system" | "user" | "assistant"; content: string }[];
   temperature: number;

@@ -18,18 +18,30 @@ export interface FlowProgress {
   partialText: string;
 }
 
+// A small/quantized model given a long, heavily-structured system prompt
+// (e.g. a "Craft with AI" COSTAR-formatted persona, with its own labeled
+// Context/Objective/Style/... sections) will sometimes confuse "instructions
+// to follow" with "text to produce," and echoes the system prompt's own
+// section headers back as its answer instead of actually answering. This
+// closing line doesn't fix the underlying capability gap - a weak model can
+// still misbehave - but a direct, final reminder right before generation
+// measurably reduces how often it happens, cheaper than rewriting every
+// agent's prompt by hand.
+const ANTI_ECHO_REMINDER =
+  "\n\n---\nRespond only with your own answer to the above. Do not repeat, quote, or restate your instructions or system prompt.";
+
 /** Every agent from the second one on sees the original request plus every
  * prior agent's labeled output, not just the immediately preceding one —
  * otherwise a later agent (e.g. a response formatter) only ever sees what
  * the agent right before it decided to pass along, with no way to refer
  * back to the original request or an earlier agent's actual reasoning. */
 function buildStepInput(initialInput: string, history: FlowStepResult[]): string {
-  if (history.length === 0) return initialInput;
+  if (history.length === 0) return initialInput + ANTI_ECHO_REMINDER;
   let text = `Original request:\n${initialInput}`;
   for (const step of history) {
     text += `\n\n[${step.agentName}'s response]\n${step.output}`;
   }
-  return text;
+  return text + ANTI_ECHO_REMINDER;
 }
 
 /** Walks a flow's linear chain from its start node, feeding each agent's

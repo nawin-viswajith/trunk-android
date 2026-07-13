@@ -7,17 +7,21 @@ import { useColors } from "../theme/ThemeContext";
 interface ContextWindowMeterProps {
   usedTokens: number;
   maxTokens: number;
-  /** Prefixes the count, e.g. "Next message" vs "Last response" - so the
-   * same meter can show a live pre-send estimate or a post-hoc actual figure
+  /** Prefixes the count, e.g. "This step" vs "Last response" - so the same
+   * meter can show a live pre-send estimate or a post-hoc actual figure
    * without the caller needing its own label. */
   label?: string;
+  /** "CPU" / "NPU" / "GPU" - whichever unit the loaded context is actually
+   * running on, shown on the same line so it's visible right where the
+   * token budget already is instead of needing its own row. */
+  unit?: string;
 }
 
 /** A model's context window is a hard ceiling, not a soft budget - once a
  * prompt exceeds n_ctx, llama.cpp errors out instead of truncating for you.
  * This surfaces the fraction being used, in both Inference and Playground,
  * so that failure is visible coming rather than a surprise mid-send. */
-export function ContextWindowMeter({ usedTokens, maxTokens, label }: ContextWindowMeterProps) {
+export function ContextWindowMeter({ usedTokens, maxTokens, label, unit }: ContextWindowMeterProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -31,6 +35,7 @@ export function ContextWindowMeter({ usedTokens, maxTokens, label }: ContextWind
     <View style={styles.wrap}>
       <View style={styles.labelRow}>
         <Text style={styles.label}>
+          {unit ? `${unit} · ` : ""}
           {label ? `${label} · ` : ""}
           {usedTokens.toLocaleString()} / {maxTokens.toLocaleString()} tokens
         </Text>
