@@ -71,8 +71,8 @@ export function AboutSettingsScreen({ navigation }: any) {
           </View>
         </View>
         <Text style={styles.shortDescription}>
-          No cloud, no server, no account - chat with GGUF models, bind them to Projects, or chain reusable Agents
-          into Flows, fully offline.
+          On-device by default, no cloud, no account required - chat with GGUF models, bind them to Projects, or
+          chain reusable Agents into Flows.
         </Text>
         {countdownMessage ? <Text style={styles.countdown}>{countdownMessage}</Text> : null}
       </Card>

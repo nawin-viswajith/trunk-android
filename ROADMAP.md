@@ -25,10 +25,27 @@ search/download, Projects, Playground (Agents/Flows), Settings.
   model: **Models** (picking/configuring a provider instead of just a
   downloaded file), **Projects** (a project's model choice), **Inference**
   (chat), and **Playground** (Agents/Flows running against a provider).
-- Tension to resolve: this changes the app's current "fully offline, no
-  cloud, no account" positioning (see README, onboarding warning, About
-  screen) — needs a clear opt-in UX so on-device-only users aren't
+- Tension to resolve: this changes the app's current "on-device by
+  default, no cloud, no account" positioning (see README, onboarding,
+  About screen) — needs a clear opt-in UX so on-device-only users aren't
   surprised by network calls or where their prompts go.
+
+## v1.1.1 — phone as local inference server
+
+- Let the phone act as a local server: other devices on the same Wi-Fi
+  (laptop, another phone) connect to it and use its loaded model for
+  inference, instead of running their own. Useful for low-spec devices
+  that can't run a model themselves, or for sharing one phone's model
+  across a Playground flow driven from a laptop.
+- Needs an embedded HTTP server (greenfield — no server library exists
+  today) wrapping the existing `llamaEngine.ts` singleton, which already
+  serializes concurrent callers via its `withLock` chain. Needs
+  `ACCESS_WIFI_STATE`/`ACCESS_NETWORK_STATE` permissions, a foreground
+  service so the server survives backgrounding, and a streaming response
+  format (SSE/WebSocket) for incremental tokens.
+- Same positioning tension as v1.1, in reverse: this is still on-device
+  inference, but now the phone is exposing it outward. Strictly opt-in
+  ("Local Server Mode" toggle), LAN-only, no relation to cloud APIs.
 
 ## v1.2 — document support for LLM
 

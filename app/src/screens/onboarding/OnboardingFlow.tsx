@@ -13,7 +13,7 @@ import { detectNpuDevices, detectGpuDevices } from "../../services/llamaEngine";
 const SLIDES = [
   {
     title: "Welcome to Trunk",
-    body: "Run large language models fully offline, entirely on your own device. No cloud, no server, no account required.",
+    body: "Run large language models on your own device by default - no cloud, no account required. Bring your own API key for heavier models, or turn your phone into a local inference server for other devices on your network.",
   },
   {
     title: "Bring your own models",

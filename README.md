@@ -4,10 +4,12 @@
 
 Local inference engine for LLMs on your phone.
 
-An Android app that runs LLMs entirely on-device - search Hugging Face,
+An Android app that runs LLMs on-device by default - search Hugging Face,
 download a GGUF model straight to your phone, and chat with it completely
-offline. No cloud, no server, and no account required to use the app; nothing
-you type is synced anywhere.
+offline. No cloud, no account required to use the app; nothing you type is
+synced anywhere. Bring your own API key for heavier models on low-spec
+devices, or turn your phone into a local inference server for other devices
+on your network.
 
 Open source, MIT licensed - see [`LICENSE`](LICENSE). Contributions and
 issues welcome.
