@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../Text";
 import { TextInput } from "../TextInput";
 import { Button } from "../Button";
@@ -108,8 +108,9 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable style={styles.card} onPress={() => {}}>
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <Pressable style={styles.backdropTouchable} onPress={onClose}>
+          <Pressable style={styles.card} onPress={() => {}}>
           <ScrollView keyboardShouldPersistTaps="handled">
             <Text style={styles.title}>{agent ? "Edit Agent" : "New Agent"}</Text>
 
@@ -228,15 +229,17 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
               </View>
             </View>
           </ScrollView>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 function createStyles(colors: ColorPalette) {
   return StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", padding: spacing.lg },
+    backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
+    backdropTouchable: { flex: 1, justifyContent: "center", padding: spacing.lg },
     card: {
       backgroundColor: colors.surface,
       borderWidth: 1,
