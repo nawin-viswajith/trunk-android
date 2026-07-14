@@ -21,6 +21,14 @@ export interface ChatSession {
   name: string;
   createdAt: number;
   updatedAt: number;
+  /** Set once, on this session's first message - whichever NPU/GPU
+   * acceleration toggles were live at that moment. Every later message in
+   * this session keeps using them regardless of later Settings changes, so
+   * a chat that started on NPU stays on NPU even after NPU is turned off;
+   * only a new session picks up the current toggle state. Undefined until
+   * the first message (see ensureDefaultSession/pinSessionUnit). */
+  pinnedNpuAcceleration?: boolean;
+  pinnedGpuAcceleration?: boolean;
 }
 
 export interface HistoryEntry {
@@ -80,6 +88,10 @@ interface ProjectState {
   deleteProject: (id: string) => void;
   createSession: (projectId: string, name?: string) => ChatSession;
   deleteSession: (sessionId: string) => void;
+  /** Records this session's NPU/GPU acceleration pin, but only the first
+   * time - a no-op on every later call, since the whole point is that it
+   * never changes again after the session's first message. */
+  pinSessionUnit: (sessionId: string, npuAcceleration: boolean, gpuAcceleration: boolean) => void;
   /** Returns the most recently used session for a project, creating one
    * (and migrating any pre-multi-session history into it) if none exist. */
   ensureDefaultSession: (projectId: string) => ChatSession;
@@ -143,6 +155,16 @@ export const useProjectStore = create<ProjectState>()(
         set((state) => ({
           sessions: state.sessions.filter((s) => s.id !== sessionId),
           history: state.history.filter((h) => h.sessionId !== sessionId),
+        }));
+      },
+
+      pinSessionUnit: (sessionId, npuAcceleration, gpuAcceleration) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) =>
+            s.id === sessionId && s.pinnedNpuAcceleration === undefined
+              ? { ...s, pinnedNpuAcceleration: npuAcceleration, pinnedGpuAcceleration: gpuAcceleration }
+              : s
+          ),
         }));
       },
 
