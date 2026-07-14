@@ -29,6 +29,11 @@ export interface ChatSession {
    * the first message (see ensureDefaultSession/pinSessionUnit). */
   pinnedNpuAcceleration?: boolean;
   pinnedGpuAcceleration?: boolean;
+  /** Which Flow this session routes messages through, if any - remembered
+   * per-session so switching back to this chat (including after an app
+   * restart) keeps using the same Flow instead of silently reverting to
+   * Direct chat. Undefined/absent means Direct chat. */
+  flowId?: string;
 }
 
 export interface HistoryEntry {
@@ -92,6 +97,8 @@ interface ProjectState {
    * time - a no-op on every later call, since the whole point is that it
    * never changes again after the session's first message. */
   pinSessionUnit: (sessionId: string, npuAcceleration: boolean, gpuAcceleration: boolean) => void;
+  /** Remembers which Flow (or none, for Direct chat) this session uses. */
+  setSessionFlow: (sessionId: string, flowId: string | undefined) => void;
   /** Returns the most recently used session for a project, creating one
    * (and migrating any pre-multi-session history into it) if none exist. */
   ensureDefaultSession: (projectId: string) => ChatSession;
@@ -165,6 +172,12 @@ export const useProjectStore = create<ProjectState>()(
               ? { ...s, pinnedNpuAcceleration: npuAcceleration, pinnedGpuAcceleration: gpuAcceleration }
               : s
           ),
+        }));
+      },
+
+      setSessionFlow: (sessionId, flowId) => {
+        set((state) => ({
+          sessions: state.sessions.map((s) => (s.id === sessionId ? { ...s, flowId } : s)),
         }));
       },
 

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { BackHandler, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "../components/Text";
 import { TextInput } from "../components/TextInput";
@@ -12,10 +12,10 @@ import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { showAlert } from "../state/useAlertStore";
 import { useProjectStore, selectProject, selectHistoryForProject, selectSessionsForProject } from "../state/useProjectStore";
-import { listLocalModels, LocalModel, modelPath, isModelDownloaded } from "../services/modelStorage";
+import { listLocalModels, LocalModel, modelPath, isModelDownloaded, filterUsableChatModels } from "../services/modelStorage";
 import { benchmarkModel } from "../services/llamaEngine";
 import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../utils/inferenceParams";
-import { logFailure } from "../services/errorLog";
+import { logFailure } from "../services/sessionLog";
 
 export function ProjectDetailScreen({ route, navigation }: any) {
   const colors = useColors();
@@ -96,7 +96,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
   );
 
   const load = useCallback(async () => {
-    setModels(await listLocalModels());
+    setModels(filterUsableChatModels(await listLocalModels()));
   }, []);
 
   useEffect(() => {
@@ -197,7 +197,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
               onPress={() => navigation.navigate("Inference", { projectId })}
               style={({ pressed }) => [styles.playButton, pressed && styles.playButtonPressed]}
             >
-              <Text style={styles.playButtonLabel}>▶ Run</Text>
+              <Text style={styles.playButtonLabel}>â–¶ Run</Text>
             </Pressable>
           ) : null}
         </View>
@@ -267,7 +267,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
           />
         </View>
         <Button
-          label={justApplied ? "Applied ✓" : "Apply Parameters"}
+          label={justApplied ? "Applied âœ“" : "Apply Parameters"}
           onPress={applyParams}
           variant={justApplied ? "primary" : "secondary"}
           disabled={justApplied}
@@ -282,7 +282,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
               {s.name} ({s.runs} run{s.runs === 1 ? "" : "s"})
             </Text>
             <Text style={styles.historyMeta}>
-              {s.promptTokens} tok in · {s.completionTokens} tok out · {s.avgTokPerSec.toFixed(1)} tok/s
+              {s.promptTokens} tok in Â· {s.completionTokens} tok out Â· {s.avgTokPerSec.toFixed(1)} tok/s
             </Text>
           </View>
         ))}
@@ -369,3 +369,4 @@ function createStyles(colors: ColorPalette) {
     historyMeta: { color: colors.running, fontSize: 11, fontFamily: "monospace", marginTop: 2 },
   });
 }
+

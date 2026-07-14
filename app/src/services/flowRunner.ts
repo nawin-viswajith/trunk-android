@@ -1,6 +1,7 @@
 ﻿import { Agent, Flow } from "../state/useFlowStore";
 import { complete, CompletionResult, ensureLoaded } from "./llamaEngine";
 import { modelPath } from "./modelStorage";
+import { logEvent } from "./sessionLog";
 
 export interface FlowStepResult {
   nodeId: string;
@@ -16,6 +17,30 @@ export interface FlowProgress {
   agentId: string;
   agentName: string;
   partialText: string;
+}
+
+/** Sums every step's stats into one CompletionResult-shaped total, so a
+ * flow-routed history entry (or a "used so far" token meter) can show real
+ * numbers instead of the zeros a caller might otherwise hardcode for a
+ * multi-step run - per-step tok/s figures can't just be averaged (steps
+ * take different amounts of time), so this re-derives both rates from the
+ * summed token counts and summed durations instead. */
+export function aggregateFlowStats(steps: FlowStepResult[]): CompletionResult {
+  const promptTokens = steps.reduce((sum, s) => sum + s.stats.promptTokens, 0);
+  const tokens = steps.reduce((sum, s) => sum + s.stats.tokens, 0);
+  const promptMs = steps.reduce((sum, s) => sum + s.stats.promptMs, 0);
+  const completionMs = steps.reduce((sum, s) => sum + s.stats.completionMs, 0);
+  const totalMs = steps.reduce((sum, s) => sum + s.stats.totalMs, 0);
+  return {
+    text: steps.length > 0 ? steps[steps.length - 1].output : "",
+    tokens,
+    tokensPerSecond: completionMs > 0 ? tokens / (completionMs / 1000) : 0,
+    promptTokens,
+    promptMs,
+    promptTokensPerSecond: promptMs > 0 ? promptTokens / (promptMs / 1000) : 0,
+    completionMs,
+    totalMs,
+  };
 }
 
 /** Overrides the flow's own stored generation settings for this run only -
@@ -144,5 +169,6 @@ export async function runFlow(
     nodeId = node.nextNodeId;
   }
 
+  logEvent("Flow run", `"${flow.name}", ${history.length} step(s)`);
   return history.length > 0 ? history[history.length - 1].output : initialInput;
 }

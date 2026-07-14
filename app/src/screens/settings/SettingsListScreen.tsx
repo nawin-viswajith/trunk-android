@@ -4,31 +4,19 @@ import { Text } from "../../components/Text";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { createScreenStyles } from "../../theme/layout";
-import { useSettingsStore } from "../../state/useSettingsStore";
-import { wasDeveloperModeUnlockedAtBoot } from "../../state/sessionFlags";
 
 const CATEGORIES: { route: string; label: string; hint: string }[] = [
   { route: "Appearance Settings", label: "Appearance", hint: "Light/dark theme, font, and accent color." },
   { route: "Chat & Downloads Settings", label: "Chat & Downloads", hint: "Response stats, and mobile data vs. Wi-Fi." },
   { route: "Performance Settings", label: "Performance", hint: "Lite Mode, and keeping Trunk running in the background." },
+  { route: "Developer Options", label: "Developer Options", hint: "Test suite, failure log, storage inspector, and logs." },
   { route: "About Settings", label: "About", hint: "What Trunk is, and its license." },
 ];
-
-const DEVELOPER_CATEGORY = {
-  route: "Developer Options",
-  label: "Developer Options",
-  hint: "Test suite, failure log, and storage inspector.",
-};
 
 export function SettingsListScreen({ navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const developerModeUnlocked = useSettingsStore((s) => s.developerModeUnlocked);
-  // OR'd with the boot-time snapshot so turning the toggle off doesn't yank
-  // the row out from under the user mid-session — it still takes effect
-  // for the next launch (see sessionFlags.ts).
-  const showDeveloperOptions = developerModeUnlocked || wasDeveloperModeUnlockedAtBoot();
-  const categories = showDeveloperOptions ? [...CATEGORIES, DEVELOPER_CATEGORY] : CATEGORIES;
+  const categories = CATEGORIES;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

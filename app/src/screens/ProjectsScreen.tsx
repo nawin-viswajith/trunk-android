@@ -13,7 +13,7 @@ import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { useProjectStore } from "../state/useProjectStore";
-import { listLocalModels, LocalModel } from "../services/modelStorage";
+import { listLocalModels, LocalModel, filterUsableChatModels } from "../services/modelStorage";
 import { fuzzyMatch } from "../utils/fuzzy";
 
 const GUIDE_STEPS: GuideStep[] = [
@@ -51,8 +51,8 @@ export function ProjectsScreen({ navigation }: any) {
   const selectionMode = selectedIds.size > 0;
 
   useEffect(() => {
-    listLocalModels().then(setModels);
-    const unsubscribe = navigation.addListener("focus", () => listLocalModels().then(setModels));
+    listLocalModels().then((list) => setModels(filterUsableChatModels(list)));
+    const unsubscribe = navigation.addListener("focus", () => listLocalModels().then((list) => setModels(filterUsableChatModels(list))));
     return unsubscribe;
   }, [navigation]);
 

@@ -45,15 +45,15 @@ interface SettingsState {
    * future hybrid mode, not this toggle pair). Defaults off for the same
    * reason NPU does — unverified on most devices. */
   gpuAcceleration: boolean;
+  /** Keeps the screen from sleeping while a model is downloading or a
+   * response is generating - off by default since it costs battery, same
+   * opt-in convention as Lite Mode/NPU/GPU. */
+  keepScreenOnDuringActivity: boolean;
   /** true = Urbanist (see theme/fonts.ts), false = platform default system font. */
   useCustomFont: boolean;
   /** Once true, the hidden theme picker stays visible in Settings forever —
    * found via 7 taps on the app icon in the About section. */
   secretThemesUnlocked: boolean;
-  /** Once true, the Developer Options tile stays visible in Settings forever
-   * — found via 14 taps (continuing past the 7-tap Secret Themes threshold)
-   * on the same app icon in the About section. */
-  developerModeUnlocked: boolean;
   /** "none" = normal light/dark + accent-preset resolution; anything else
    * fully overrides it (see SECRET_THEMES in theme/colors.ts). */
   secretTheme: SecretThemeId | "none";
@@ -63,6 +63,13 @@ interface SettingsState {
   totalUsageMs: number;
   /** Once true, the feedback prompt never shows again this install. */
   feedbackPromptShown: boolean;
+  /** Off by default (opt-in): whether sessionLog.ts records general usage
+   * events (model loads, downloads, flow runs) alongside errors, which are
+   * always logged regardless of this flag. See LogConsentScreen.tsx. */
+  usageLoggingEnabled: boolean;
+  /** Once true, LogConsentScreen never needs to show again before "Send
+   * Logs" — the user has already seen what is/isn't collected. */
+  logConsentSeen: boolean;
   setBackendUrl: (url: string) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setDarkContrast: (contrast: DarkContrast) => void;
@@ -74,18 +81,19 @@ interface SettingsState {
   setLiteMode: (value: boolean) => void;
   setNpuAcceleration: (value: boolean) => void;
   setGpuAcceleration: (value: boolean) => void;
+  setKeepScreenOnDuringActivity: (value: boolean) => void;
   setUseCustomFont: (value: boolean) => void;
   unlockSecretThemes: () => void;
-  unlockDeveloperMode: () => void;
-  /** Explicit on/off, unlike the tap-to-unlock actions above — lets a
-   * settings toggle turn either feature back off (re-hiding it, same as
+  /** Explicit on/off, unlike the tap-to-unlock action above — lets a
+   * settings toggle turn the feature back off (re-hiding it, same as
    * Android's own "Disable developer options" switch), requiring the full
    * tap sequence again to bring it back. */
   setSecretThemesUnlocked: (value: boolean) => void;
-  setDeveloperModeUnlocked: (value: boolean) => void;
   setSecretTheme: (theme: SecretThemeId | "none") => void;
   addUsageMs: (ms: number) => void;
   setFeedbackPromptShown: (value: boolean) => void;
+  setUsageLoggingEnabled: (value: boolean) => void;
+  setLogConsentSeen: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -104,12 +112,14 @@ export const useSettingsStore = create<SettingsState>()(
       liteMode: false,
       npuAcceleration: false,
       gpuAcceleration: false,
+      keepScreenOnDuringActivity: false,
       useCustomFont: true,
       secretThemesUnlocked: false,
-      developerModeUnlocked: false,
       secretTheme: "none",
       totalUsageMs: 0,
       feedbackPromptShown: false,
+      usageLoggingEnabled: false,
+      logConsentSeen: false,
       setBackendUrl: (url) => set({ backendUrl: url }),
       setThemeMode: (mode) => set({ themeMode: mode }),
       setDarkContrast: (contrast) => set({ darkContrast: contrast }),
@@ -127,14 +137,15 @@ export const useSettingsStore = create<SettingsState>()(
       setLiteMode: (value) => set({ liteMode: value }),
       setNpuAcceleration: (value) => set({ npuAcceleration: value }),
       setGpuAcceleration: (value) => set({ gpuAcceleration: value }),
+      setKeepScreenOnDuringActivity: (value) => set({ keepScreenOnDuringActivity: value }),
       setUseCustomFont: (value) => set({ useCustomFont: value }),
       unlockSecretThemes: () => set({ secretThemesUnlocked: true }),
-      unlockDeveloperMode: () => set({ developerModeUnlocked: true }),
       setSecretThemesUnlocked: (value) => set({ secretThemesUnlocked: value }),
-      setDeveloperModeUnlocked: (value) => set({ developerModeUnlocked: value }),
       setSecretTheme: (theme) => set({ secretTheme: theme }),
       addUsageMs: (ms) => set((state) => ({ totalUsageMs: state.totalUsageMs + ms })),
       setFeedbackPromptShown: (value) => set({ feedbackPromptShown: value }),
+      setUsageLoggingEnabled: (value) => set({ usageLoggingEnabled: value }),
+      setLogConsentSeen: (value) => set({ logConsentSeen: value }),
     }),
     {
       name: "pocketcoder-settings",

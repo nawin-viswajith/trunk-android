@@ -1,7 +1,8 @@
 import "react-native-gesture-handler";
 import React, { useEffect, useRef, useState } from "react";
-import { AppState, Linking } from "react-native";
-import { NavigationContainer, DarkTheme, DefaultTheme } from "@react-navigation/native";
+import { AppState, Linking, Share } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NavigationContainer, DarkTheme, DefaultTheme, NavigationState } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -17,11 +18,19 @@ import { showAlert } from "./src/state/useAlertStore";
 import { isBatteryOptimizationExempt, requestBatteryOptimizationExemption } from "./src/services/batteryOptimization";
 import { FEEDBACK_FORM_URL } from "./src/copy/links";
 import { captureSessionVisibilityFlags } from "./src/state/sessionFlags";
+import { useDownloadStore } from "./src/state/useDownloadStore";
+import { setKeepAwake } from "./src/services/keepAwake";
+import { markSessionBoot, didPreviousSessionError, getSessionLog, formatSessionLog } from "./src/services/sessionLog";
+import appJson from "./app.json";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const FEEDBACK_USAGE_THRESHOLD_MS = 10 * 60 * 1000;
 const USAGE_TICK_MS = 15000;
+// Keyed by app version so an update that renames/removes a screen can never
+// restore a stale route react-navigation no longer recognizes — worst case
+// after an update is falling back to the default initial route, never a crash.
+const NAV_STATE_STORAGE_KEY = `pocketcoder-nav-state-${appJson.expo.version}`;
 
 function AppInner() {
   const colors = useColors();
@@ -30,10 +39,17 @@ function AppInner() {
   const [bootDone, setBootDone] = useState(false);
   const fontsLoaded = useAppFonts();
   const batteryPromptShown = useRef(false);
+  const reportPromptShown = useRef(false);
   const totalUsageMs = useSettingsStore((s) => s.totalUsageMs);
   const feedbackPromptShown = useSettingsStore((s) => s.feedbackPromptShown);
   const hasAnyChatHistory = useProjectStore((s) => s.history.length > 0);
   const feedbackPromptTriggered = useRef(false);
+  const hasActiveDownload = useDownloadStore((s) => Object.values(s.downloads).some((d) => d.status === "downloading"));
+  const [initialNavState, setInitialNavState] = useState<NavigationState | undefined>(undefined);
+
+  useEffect(() => {
+    setKeepAwake("trunk-download", hasActiveDownload);
+  }, [hasActiveDownload]);
 
   // Ticks while the app is actually in the foreground, not wall-clock time —
   // a phone left on Trunk in the background for hours shouldn't count
@@ -78,15 +94,34 @@ function AppInner() {
     const minDuration = 1500 + Math.random() * 1000;
     const start = Date.now();
     let settled = false;
+    let navStateLoaded = false;
 
     const trySettle = () => {
       if (settled) return;
-      if (!useSettingsStore.persist.hasHydrated() || !useProjectStore.persist.hasHydrated()) return;
+      if (!useSettingsStore.persist.hasHydrated() || !useProjectStore.persist.hasHydrated() || !navStateLoaded) return;
       settled = true;
       captureSessionVisibilityFlags();
+      markSessionBoot();
       const remaining = Math.max(0, minDuration - (Date.now() - start));
       setTimeout(() => setBootDone(true), remaining);
     };
+
+    // Restores whichever tab/stack screen the user was last on — without
+    // this, react-navigation always starts at its default initial route,
+    // which is invisible as long as the OS keeps the JS process alive across
+    // a background/foreground cycle, but very visible the moment Android
+    // kills the process for memory (common here, given how much RAM a loaded
+    // model can hold) and cold-starts it back on resume - "sometimes it
+    // worked, sometimes it failed" is exactly that process-survival coin flip.
+    AsyncStorage.getItem(NAV_STATE_STORAGE_KEY)
+      .then((raw) => {
+        if (raw) setInitialNavState(JSON.parse(raw));
+      })
+      .catch(() => {})
+      .finally(() => {
+        navStateLoaded = true;
+        trySettle();
+      });
 
     const unsubSettings = useSettingsStore.persist.onFinishHydration(trySettle);
     const unsubProject = useProjectStore.persist.onFinishHydration(trySettle);
@@ -118,6 +153,31 @@ function AppInner() {
     });
   }, [bootDone, hasOnboarded]);
 
+  useEffect(() => {
+    // Only makes sense once usage logging is actually on - errors are
+    // logged regardless, but there's nothing to proactively offer to send
+    // if the user never opted into that in the first place.
+    if (!bootDone || !hasOnboarded || !useSettingsStore.getState().usageLoggingEnabled || reportPromptShown.current) return;
+    reportPromptShown.current = true;
+    didPreviousSessionError().then((hadError) => {
+      if (!hadError) return;
+      showAlert(
+        "Trunk had a problem last time",
+        "Want to send a report? It'll go through your own share sheet - nothing is sent automatically.",
+        [
+          { label: "Not now", variant: "neutral" },
+          {
+            label: "Send Logs",
+            onPress: async () => {
+              const entries = await getSessionLog();
+              await Share.share({ message: formatSessionLog(entries) });
+            },
+          },
+        ]
+      );
+    });
+  }, [bootDone, hasOnboarded]);
+
   const navigationTheme = {
     ...(scheme === "light" ? DefaultTheme : DarkTheme),
     colors: {
@@ -140,7 +200,13 @@ function AppInner() {
         {!hasOnboarded ? (
           <OnboardingFlow />
         ) : (
-          <NavigationContainer theme={navigationTheme}>
+          <NavigationContainer
+            theme={navigationTheme}
+            initialState={initialNavState}
+            onStateChange={(state) => {
+              AsyncStorage.setItem(NAV_STATE_STORAGE_KEY, JSON.stringify(state)).catch(() => {});
+            }}
+          >
             <AppNavigator />
           </NavigationContainer>
         )}

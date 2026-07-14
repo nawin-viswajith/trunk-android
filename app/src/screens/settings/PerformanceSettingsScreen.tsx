@@ -11,6 +11,7 @@ import { showAlert } from "../../state/useAlertStore";
 import { isBatteryOptimizationExempt, requestBatteryOptimizationExemption } from "../../services/batteryOptimization";
 import { detectNpuDevices, detectGpuDevices } from "../../services/llamaEngine";
 import { createScreenStyles } from "../../theme/layout";
+import { LogConsentModal } from "../../components/LogConsentModal";
 
 export function PerformanceSettingsScreen() {
   const colors = useColors();
@@ -22,11 +23,28 @@ export function PerformanceSettingsScreen() {
   const setNpuAcceleration = useSettingsStore((s) => s.setNpuAcceleration);
   const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
   const setGpuAcceleration = useSettingsStore((s) => s.setGpuAcceleration);
+  const keepScreenOnDuringActivity = useSettingsStore((s) => s.keepScreenOnDuringActivity);
+  const setKeepScreenOnDuringActivity = useSettingsStore((s) => s.setKeepScreenOnDuringActivity);
+  const usageLoggingEnabled = useSettingsStore((s) => s.usageLoggingEnabled);
+  const setUsageLoggingEnabled = useSettingsStore((s) => s.setUsageLoggingEnabled);
+  const logConsentSeen = useSettingsStore((s) => s.logConsentSeen);
+  const setLogConsentSeen = useSettingsStore((s) => s.setLogConsentSeen);
+  const [consentVisible, setConsentVisible] = useState(false);
   // null while unknown (not yet checked this focus) — the card renders
   // nothing until resolved, rather than flashing then disappearing.
   const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null);
   const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
   const [gpuDevices, setGpuDevices] = useState<string[] | null>(null);
+
+  // Turning it off never needs consent - only the transition to "on" does,
+  // and only the first time ever (logConsentSeen persists across toggles).
+  const onToggleUsageLogging = (value: boolean) => {
+    if (value && !logConsentSeen) {
+      setConsentVisible(true);
+      return;
+    }
+    setUsageLoggingEnabled(value);
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -122,6 +140,21 @@ export function PerformanceSettingsScreen() {
       </Card>
 
       <Card>
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextWrap}>
+            <Text style={styles.toggleLabel}>Keep Screen On</Text>
+            <Text style={styles.hint}>Prevents the screen from sleeping while downloading a model or generating a response.</Text>
+          </View>
+          <Switch
+            value={keepScreenOnDuringActivity}
+            onValueChange={setKeepScreenOnDuringActivity}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.textPrimary}
+          />
+        </View>
+      </Card>
+
+      <Card>
         <Text style={styles.sectionTitle}>NPU Acceleration</Text>
         <Text style={styles.hint}>
           Experimental. Offloads inference to the Hexagon NPU on supported Qualcomm chipsets (Snapdragon 8 Gen 1 and
@@ -180,6 +213,34 @@ export function PerformanceSettingsScreen() {
           />
         </View>
       </Card>
+
+      <Card>
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextWrap}>
+            <Text style={styles.toggleLabel}>Usage Logging</Text>
+            <Text style={styles.hint}>
+              Helps understand how Trunk is used. Off by default - your prompts and responses are never included.
+              See Developer Options &gt; Send Logs.
+            </Text>
+          </View>
+          <Switch
+            value={usageLoggingEnabled}
+            onValueChange={onToggleUsageLogging}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.textPrimary}
+          />
+        </View>
+      </Card>
+
+      <LogConsentModal
+        visible={consentVisible}
+        onAllow={() => {
+          setLogConsentSeen(true);
+          setUsageLoggingEnabled(true);
+          setConsentVisible(false);
+        }}
+        onDecline={() => setConsentVisible(false)}
+      />
 
       {batteryExempt !== null ? (
         <Card>

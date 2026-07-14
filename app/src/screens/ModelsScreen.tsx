@@ -25,7 +25,7 @@ import {
 import { formatBytes } from "../utils/format";
 import { fuzzyMatch } from "../utils/fuzzy";
 import { showAlert } from "../state/useAlertStore";
-import { flushDownloadProgress, useDownloadStore } from "../state/useDownloadStore";
+import { flushDownloadProgress, retryFailedDownload, useDownloadStore } from "../state/useDownloadStore";
 
 const GUIDE_STEPS: GuideStep[] = [
   {
@@ -187,6 +187,9 @@ export function ModelsScreen({ navigation }: any) {
                   {d.filename} — download failed
                 </Text>
               </View>
+              <Pressable onPress={() => retryFailedDownload(d.filename)} hitSlop={10} style={styles.downloadBannerRetry}>
+                <Text style={styles.downloadBannerRetryLabel}>Retry</Text>
+              </Pressable>
               <Pressable onPress={() => useDownloadStore.getState().clearDownload(d.filename)} hitSlop={10}>
                 <Text style={styles.downloadBannerDismiss}>×</Text>
               </Pressable>
@@ -342,6 +345,8 @@ function createStyles(colors: ColorPalette) {
     },
     downloadBannerTextWrap: { flex: 1, marginRight: spacing.sm },
     downloadBannerFailedLabel: { color: colors.error, fontSize: 12, fontFamily: "monospace" },
+    downloadBannerRetry: { marginRight: spacing.md },
+    downloadBannerRetryLabel: { color: colors.accent, fontSize: 12, fontWeight: "700" },
     downloadBannerDismiss: { color: colors.error, fontSize: 16, fontWeight: "700" },
     flatList: { flex: 1 },
     list: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl * 2 },

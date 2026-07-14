@@ -6,7 +6,7 @@ import { Button } from "../Button";
 import { CheckIndicator } from "../CheckIndicator";
 import { Agent } from "../../state/useFlowStore";
 import { complete, ensureLoaded, getActiveModelPath } from "../../services/llamaEngine";
-import { listLocalModels, LocalModel, modelPath } from "../../services/modelStorage";
+import { listLocalModels, LocalModel, modelPath, filterUsableChatModels } from "../../services/modelStorage";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 
@@ -20,6 +20,23 @@ interface AgentEditorModalProps {
 type Mode = "write" | "craft";
 
 const CRAFT_CONTEXT_LENGTH = 2048;
+
+// Shown as placeholder text in the Name/purpose fields - one pair picked at
+// random each time the modal opens (not per-render, and never shuffled
+// independently of each other, since a mismatched name+description reads as
+// broken example content rather than inspiration).
+const AGENT_EXAMPLES: { name: string; purpose: string }[] = [
+  { name: "Brainstormer", purpose: "Brainstorms creative angles on a topic" },
+  { name: "Summarizer", purpose: "Condenses long text into a short, clear summary" },
+  { name: "Code Reviewer", purpose: "Reviews code for bugs, style issues, and improvements" },
+  { name: "Translator", purpose: "Translates text between languages while preserving tone" },
+  { name: "Explainer", purpose: "Explains complex topics in simple, plain language" },
+  { name: "Formatter", purpose: "Cleans up and formats text into clear, structured output" },
+  { name: "Critic", purpose: "Evaluates ideas and points out weaknesses or gaps" },
+  { name: "Tone Rewriter", purpose: "Rewrites text to match a specific tone or style" },
+  { name: "Fact Checker", purpose: "Flags claims that seem inaccurate or need verification" },
+  { name: "Outline Generator", purpose: "Breaks a topic down into a structured outline" },
+];
 
 /** "Craft with AI" always fills the systemPrompt field for review/edit —
  * it never saves the generated text directly, so a bad draft is just as
@@ -37,6 +54,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
   const [models, setModels] = useState<LocalModel[]>([]);
   const [activeFilename, setActiveFilename] = useState<string | null>(null);
   const [loadingModel, setLoadingModel] = useState<string | null>(null);
+  const [example, setExample] = useState(AGENT_EXAMPLES[0]);
 
   useEffect(() => {
     if (!visible) return;
@@ -45,9 +63,11 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
     setSystemPrompt(agent?.systemPrompt ?? "");
     setPurpose("");
     setCraftError(null);
+    setExample(AGENT_EXAMPLES[Math.floor(Math.random() * AGENT_EXAMPLES.length)]);
     const activePath = getActiveModelPath();
     setModelReady(!!activePath);
-    listLocalModels().then((list) => {
+    listLocalModels().then((allModels) => {
+      const list = filterUsableChatModels(allModels);
       setModels(list);
       setActiveFilename(activePath ? list.find((m) => modelPath(m.filename) === activePath)?.filename ?? null : null);
     });
@@ -118,7 +138,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="Brainstormer"
+              placeholder={example.name}
               placeholderTextColor={colors.textSecondary}
               style={styles.input}
             />
@@ -192,7 +212,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
                 <TextInput
                   value={purpose}
                   onChangeText={setPurpose}
-                  placeholder="Brainstorms creative angles on a topic"
+                  placeholder={example.purpose}
                   placeholderTextColor={colors.textSecondary}
                   style={[styles.input, styles.textareaSmall]}
                   multiline
