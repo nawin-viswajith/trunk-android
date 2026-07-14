@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "1.3.4",
+  "version": "1.3.5",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/iceland": "^0.4.1",
@@ -15,7 +15,7 @@
     "expo-file-system": "~19.0.23",
     "expo-font": "~14.0.12",
     "expo-intent-launcher": "~13.0.8",
-    "expo-keep-awake": "^57.0.0",
+    "expo-keep-awake": "~15.0.8",
     "expo-network": "~8.0.8",
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",

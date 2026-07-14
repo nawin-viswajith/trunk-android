@@ -1,11 +1,9 @@
 import React, { useMemo } from "react";
 import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
-import { Card } from "../../components/Card";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { createScreenStyles } from "../../theme/layout";
-import { useSettingsStore } from "../../state/useSettingsStore";
 import { TRUNK_ANDROID_REPO_URL } from "../../copy/links";
 import { getSessionLog, formatSessionLog } from "../../services/sessionLog";
 
@@ -21,7 +19,6 @@ const ROWS: { route: string; label: string; hint: string }[] = [
 export function DeveloperOptionsScreen({ navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const backendUrl = useSettingsStore((s) => s.backendUrl);
 
   const sendLogs = async () => {
     const entries = await getSessionLog();
@@ -65,13 +62,6 @@ export function DeveloperOptionsScreen({ navigation }: any) {
         </View>
         <Text style={styles.rowCaret}>›</Text>
       </Pressable>
-
-      <Card>
-        <Text style={styles.rowLabel}>Backend</Text>
-        <Text style={styles.debugLine} selectable>
-          {backendUrl}
-        </Text>
-      </Card>
     </ScrollView>
   );
 }
@@ -96,6 +86,5 @@ function createStyles(colors: ColorPalette) {
     rowLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: "600", marginBottom: 2 },
     rowHint: { color: colors.textSecondary, fontSize: 12 },
     rowCaret: { color: colors.textSecondary, fontSize: 22, fontWeight: "700" },
-    debugLine: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace", marginTop: spacing.xs },
   });
 }
