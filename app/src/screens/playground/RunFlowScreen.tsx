@@ -14,6 +14,7 @@ import { ensureLoaded, countTokens, getActiveInferenceUnit } from "../../service
 import { modelPath } from "../../services/modelStorage";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../../services/fileAttachment";
 import { logFailure } from "../../services/errorLog";
+import { useSettingsStore } from "../../state/useSettingsStore";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
@@ -26,6 +27,8 @@ export function RunFlowScreen({ route, navigation }: any) {
 
   const flow = useFlowStore((s) => selectFlow(s.flows, flowId));
   const agents = useFlowStore((s) => s.agents);
+  const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
+  const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
 
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
@@ -68,14 +71,18 @@ export function RunFlowScreen({ route, navigation }: any) {
 
   // Preload so the input's live token estimate (which needs a tokenizer)
   // is available while composing, not only once Run is actually pressed -
-  // a cheap no-op via ensureLoaded's singleton reuse if already loaded.
+  // a cheap no-op via ensureLoaded's singleton reuse if already loaded. Also
+  // depends on npuAcceleration/gpuAcceleration so toggling either while this
+  // screen is mounted reloads and relabels immediately, instead of only
+  // taking effect on the next Run - skipped while `running` since yanking
+  // the context out from under an in-flight flow isn't safe.
   useEffect(() => {
-    if (flow?.modelFilename) {
+    if (flow?.modelFilename && !running) {
       ensureLoaded(modelPath(flow.modelFilename), { contextLength: flow.contextLength })
         .then(() => setInferenceUnit(getActiveInferenceUnit()))
         .catch(() => {});
     }
-  }, [flow?.modelFilename, flow?.contextLength]);
+  }, [flow?.modelFilename, flow?.contextLength, running, npuAcceleration, gpuAcceleration]);
 
   useEffect(() => {
     const attachmentText = attachment ? formatAttachmentForPrompt(attachment) + "\n\n" : "";

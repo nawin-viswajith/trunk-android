@@ -95,7 +95,10 @@ export function InferenceScreen({ route, navigation }: any) {
   const addHistoryEntry = useProjectStore((s) => s.addHistoryEntry);
   const createSession = useProjectStore((s) => s.createSession);
   const ensureDefaultSession = useProjectStore((s) => s.ensureDefaultSession);
+  const pinSessionUnit = useProjectStore((s) => s.pinSessionUnit);
   const showInferenceStats = useSettingsStore((s) => s.showInferenceStats);
+  const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
+  const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
   const flows = useFlowStore((s) => s.flows);
   const agents = useFlowStore((s) => s.agents);
   const [activeProjectId, setActiveProjectId] = useState<string | undefined>(projectIdParam);
@@ -115,10 +118,14 @@ export function InferenceScreen({ route, navigation }: any) {
   const [placeholder, setPlaceholder] = useState(randomPlaceholder);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
-  // Debounced estimate of how many tokens the NEXT message would use, so a
-  // context-window overflow is visible before hitting send, not only as a
-  // native error afterward. 0 while nothing loaded/nothing typed yet.
-  const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
+  // Tokens used by the conversation so far (prior turns only) - only
+  // changes once an exchange actually completes, not on every keystroke.
+  const [usedTokenEstimate, setUsedTokenEstimate] = useState(0);
+  // Debounced estimate of how many tokens the current, not-yet-sent draft
+  // would add, so a context-window overflow is visible before hitting
+  // send, not only as a native error afterward. Shown separately from
+  // usedTokenEstimate so typing doesn't make the main total look glitchy.
+  const [draftTokenEstimate, setDraftTokenEstimate] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   // Null until a model has actually finished loading at least once — shown
   // next to the composer so it's visible before the user sends anything,
@@ -253,18 +260,38 @@ export function InferenceScreen({ route, navigation }: any) {
       ]);
   }, [history, activeSessionId]);
 
+  // A session that's already sent a message is pinned to whichever
+  // NPU/GPU toggles were live at that first send (see pinSessionUnit) - it
+  // keeps using them for every later message regardless of later Settings
+  // changes. A session with no messages yet has nothing to pin, so it just
+  // tracks the live toggle until its first send commits one.
+  const effectiveNpuAcceleration = activeSession?.pinnedNpuAcceleration ?? npuAcceleration;
+  const effectiveGpuAcceleration = activeSession?.pinnedGpuAcceleration ?? gpuAcceleration;
+
   // Preload the project's model as soon as it's selected, not only once the
   // first message is actually sent — otherwise the live token estimate
   // below silently reads 0 for that entire first message (countTokens needs
   // a loaded context), and the inference-unit indicator has nothing to show
   // until after a full round-trip. Direct-chat only; a Flow's model loads
   // inside runFlow itself once Run is pressed.
+  //
+  // Also depends on the effective NPU/GPU values so toggling either in
+  // Settings while this screen is still mounted reloads (and relabels)
+  // immediately for a not-yet-pinned session — a pinned session's effective
+  // values never change from a live toggle, so this just no-ops for it via
+  // ensureLoaded's own already-loaded check. Skipped while `running` since
+  // yanking the context out from under an in-flight completion isn't safe;
+  // send() still re-checks right before that message.
   useEffect(() => {
-    if (activeFlow || !activeProject?.modelFilename) return;
+    if (activeFlow || !activeProject?.modelFilename || running) return;
     let cancelled = false;
     isModelDownloaded(activeProject.modelFilename).then((downloaded) => {
       if (!downloaded || cancelled) return;
-      ensureLoaded(modelPath(activeProject.modelFilename!), { contextLength: activeProject.contextLength })
+      ensureLoaded(modelPath(activeProject.modelFilename!), {
+        contextLength: activeProject.contextLength,
+        npuAcceleration: effectiveNpuAcceleration,
+        gpuAcceleration: effectiveGpuAcceleration,
+      })
         .then(() => {
           if (!cancelled) setInferenceUnit(getActiveInferenceUnit());
         })
@@ -273,30 +300,62 @@ export function InferenceScreen({ route, navigation }: any) {
     return () => {
       cancelled = true;
     };
-  }, [activeFlow, activeProject?.modelFilename, activeProject?.contextLength]);
+  }, [
+    activeFlow,
+    activeProject?.modelFilename,
+    activeProject?.contextLength,
+    running,
+    effectiveNpuAcceleration,
+    effectiveGpuAcceleration,
+  ]);
 
+  // Conversation-so-far total - depends only on priorTurns, never on the
+  // draft, so it can't dip when send() clears the prompt mid-flight; it
+  // just updates once priorTurns includes the finished exchange.
   useEffect(() => {
     if (activeFlow || !activeProject?.modelFilename) {
-      setLiveTokenEstimate(0);
+      setUsedTokenEstimate(0);
+      return;
+    }
+    const candidateText = priorTurns.map((m) => m.content).join("\n\n");
+    if (!candidateText.trim()) {
+      setUsedTokenEstimate(0);
+      return;
+    }
+    let cancelled = false;
+    countTokens(candidateText).then((count) => {
+      if (!cancelled) setUsedTokenEstimate(count);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [priorTurns, activeFlow, activeProject?.modelFilename]);
+
+  // Current draft's token count - resets to 0 once send() clears the
+  // prompt, which is correct here (there's genuinely nothing un-sent left),
+  // unlike usedTokenEstimate this is meant to track the draft live.
+  useEffect(() => {
+    if (activeFlow || !activeProject?.modelFilename) {
+      setDraftTokenEstimate(0);
       return;
     }
     const attachmentText = attachment ? formatAttachmentForPrompt(attachment) + "\n\n" : "";
-    const candidateText = [...priorTurns.map((m) => m.content), attachmentText + prompt].join("\n\n");
+    const candidateText = attachmentText + prompt;
     if (!candidateText.trim()) {
-      setLiveTokenEstimate(0);
+      setDraftTokenEstimate(0);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
       countTokens(candidateText).then((count) => {
-        if (!cancelled) setLiveTokenEstimate(count);
+        if (!cancelled) setDraftTokenEstimate(count);
       });
     }, 400);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [prompt, attachment, priorTurns, activeFlow, activeProject?.modelFilename]);
+  }, [prompt, attachment, activeFlow, activeProject?.modelFilename]);
 
   const onPickAttachment = async () => {
     setAttachError(null);
@@ -360,8 +419,15 @@ export function InferenceScreen({ route, navigation }: any) {
         return;
       }
 
-      await ensureLoaded(modelPath(activeProject.modelFilename), { contextLength: activeProject.contextLength });
+      await ensureLoaded(modelPath(activeProject.modelFilename), {
+        contextLength: activeProject.contextLength,
+        npuAcceleration: effectiveNpuAcceleration,
+        gpuAcceleration: effectiveGpuAcceleration,
+      });
       setInferenceUnit(getActiveInferenceUnit());
+      // No-op once this session already has a pin (see pinSessionUnit) -
+      // this only actually commits anything on the session's first message.
+      pinSessionUnit(sessionId, npuAcceleration, gpuAcceleration);
 
       let fullText = "";
       const result = await complete(
@@ -397,7 +463,21 @@ export function InferenceScreen({ route, navigation }: any) {
       setPendingExchange(null);
       setActiveFlowStep(null);
     }
-  }, [activeProject, activeSessionId, activeFlow, agents, prompt, attachment, priorTurns, addHistoryEntry]);
+  }, [
+    activeProject,
+    activeSessionId,
+    activeFlow,
+    agents,
+    prompt,
+    attachment,
+    priorTurns,
+    addHistoryEntry,
+    effectiveNpuAcceleration,
+    effectiveGpuAcceleration,
+    npuAcceleration,
+    gpuAcceleration,
+    pinSessionUnit,
+  ]);
 
   return (
     <View style={[styles.container, { paddingBottom: keyboardHeight ? keyboardHeight + spacing.md : 0 }]}>
@@ -553,7 +633,12 @@ export function InferenceScreen({ route, navigation }: any) {
 
       <View style={styles.composer}>
         {!activeFlow && activeProject?.contextLength ? (
-          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={activeProject.contextLength} unit={inferenceUnit ?? undefined} />
+          <ContextWindowMeter
+            usedTokens={usedTokenEstimate}
+            draftTokens={draftTokenEstimate}
+            maxTokens={activeProject.contextLength}
+            unit={inferenceUnit ?? undefined}
+          />
         ) : null}
         {attachment ? (
           <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />

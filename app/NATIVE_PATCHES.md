@@ -2,7 +2,7 @@
 
 `android/` is gitignored and fully disposable — `expo prebuild` (and
 especially `expo prebuild --clean`) regenerates it from scratch, wiping any
-hand-edit made directly inside it. The two patches below are hand-edits, not
+hand-edit made directly inside it. The patches below are hand-edits, not
 Expo config, so they must be manually re-applied after any such regen. This
 file is tracked in git specifically so the exact text survives even if
 `android/` doesn't.
@@ -45,7 +45,32 @@ In `buildTypes { release { ... } }`, change the `signingConfig` line to:
 
 Then copy `signing/keystore.properties` to `android/keystore.properties`.
 
-## 2. Windows 260-char path-length fix
+## 2. Per-ABI release APK splits (`android/app/build.gradle`)
+
+llama.rn's prebuilt native libs only actually ship for `arm64-v8a` (real
+phones) and `x86_64` (emulators) - no armeabi-v7a/x86 - so a plain
+`assembleRelease` produces one bloated "universal" APK bundling both.
+Splitting gives testers/users a much smaller "optimised" arm64-only
+download alongside a "full" universal one for anything else. Insert right
+before the `signingConfigs { ... }` block:
+
+```groovy
+    splits {
+        abi {
+            reset()
+            enable true
+            universalApk true
+            include "arm64-v8a", "x86_64"
+        }
+    }
+```
+
+Produces `app-arm64-v8a-release.apk` (ship this as "optimised"),
+`app-x86_64-release.apk` (emulator-only, not distributed), and
+`app-universal-release.apk` (ship this as "full") under
+`android/app/build/outputs/apk/release/`.
+
+## 3. Windows 260-char path-length fix
 
 Windows' MAX_PATH limit breaks the native CMake build when source files live
 deep in `node_modules` — both the app module's own autolinked-codegen CMake
@@ -99,4 +124,5 @@ if (System.getProperty('os.name').toLowerCase().contains('windows')) {
 ```bash
 grep -c "hasReleaseKeystore" android/app/build.gradle   # expect 4
 grep -c "rncxx" android/app/build.gradle android/build.gradle   # expect 1 each
+grep -c "splits" android/app/build.gradle   # expect 1
 ```

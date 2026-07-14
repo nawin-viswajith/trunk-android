@@ -6,6 +6,13 @@ export interface EngineParams {
   contextLength: number;
   threads?: number;
   nGpuLayers?: number;
+  /** Overrides the live Settings toggle for this load - used to keep an
+   * already-started chat session pinned to whichever unit it began on, even
+   * after the Settings toggle changes. Omit to just read the current
+   * Settings value (the right choice for a session's first-ever message,
+   * a Flow run, or anything else that isn't session-pinned). */
+  npuAcceleration?: boolean;
+  gpuAcceleration?: boolean;
 }
 
 /** Lite Mode's fixed low thread count — deliberately not scaled to the
@@ -144,13 +151,13 @@ function withLock<T>(fn: () => Promise<T>): Promise<T> {
 export async function ensureLoaded(modelPath: string, params: EngineParams): Promise<void> {
   return withLock(async () => {
     const effectiveThreads = params.threads ?? (useSettingsStore.getState().liteMode ? LITE_MODE_THREADS : undefined);
-    const npuRequested = useSettingsStore.getState().npuAcceleration;
+    const npuRequested = params.npuAcceleration ?? useSettingsStore.getState().npuAcceleration;
     const npuDevices = npuRequested ? await detectNpuDevices() : [];
     const npuActive = npuDevices.length > 0;
     // NPU wins if both happen to be requested at once — combining them
     // (true hybrid offload) is its own future mode, not something this
     // toggle pair falls into by accident.
-    const gpuRequested = !npuActive && useSettingsStore.getState().gpuAcceleration;
+    const gpuRequested = !npuActive && (params.gpuAcceleration ?? useSettingsStore.getState().gpuAcceleration);
     const gpuDevices = gpuRequested ? await detectGpuDevices() : [];
     const gpuActive = gpuDevices.length > 0;
 
