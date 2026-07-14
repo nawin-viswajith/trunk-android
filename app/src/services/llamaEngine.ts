@@ -1,6 +1,7 @@
 ﻿import { Platform } from "react-native";
 import { initLlama, LlamaContext, getBackendDevicesInfo } from "llama.rn";
 import { useSettingsStore } from "../state/useSettingsStore";
+import { logEvent } from "./sessionLog";
 
 export interface EngineParams {
   contextLength: number;
@@ -203,6 +204,7 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
       devices: activeContext.devices ?? [],
       reasonNoGPU: activeContext.reasonNoGPU ?? "",
     };
+    logEvent("Model load", `${modelPath.split("/").pop()}, ctx=${params.contextLength}, unit=${getActiveInferenceUnit()}`);
   });
 }
 

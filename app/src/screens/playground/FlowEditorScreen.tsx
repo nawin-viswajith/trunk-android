@@ -10,7 +10,7 @@ import { ConfirmModal } from "../../components/ConfirmModal";
 import { AddTile } from "../../components/AddTile";
 import { FlowCanvas } from "../../components/flow/FlowCanvas";
 import { NODE_WIDTH, NODE_HEIGHT } from "../../components/flow/FlowNodeView";
-import { listLocalModels, LocalModel } from "../../services/modelStorage";
+import { listLocalModels, LocalModel, filterUsableChatModels } from "../../services/modelStorage";
 import { selectAgent, selectFlow, useFlowStore } from "../../state/useFlowStore";
 import { useSuppressTabSwipe } from "../../navigation/SwipeableScreen";
 import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../../utils/inferenceParams";
@@ -112,7 +112,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
 
   useFocusEffect(
     useCallback(() => {
-      listLocalModels().then(setModels);
+      listLocalModels().then((list) => setModels(filterUsableChatModels(list)));
     }, [])
   );
 

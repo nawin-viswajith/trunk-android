@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { Linking, Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { Text } from "../../components/Text";
 import { Card } from "../../components/Card";
 import { ColorPalette, spacing } from "../../theme/colors";
@@ -7,6 +7,7 @@ import { useColors } from "../../theme/ThemeContext";
 import { createScreenStyles } from "../../theme/layout";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { TRUNK_ANDROID_REPO_URL } from "../../copy/links";
+import { getSessionLog, formatSessionLog } from "../../services/sessionLog";
 
 const ROWS: { route: string; label: string; hint: string }[] = [
   { route: "Diagnostics", label: "Test Suite", hint: "Run the on-device self-check suite and share the log." },
@@ -14,36 +15,31 @@ const ROWS: { route: string; label: string; hint: string }[] = [
   { route: "Storage Inspector", label: "Storage Inspector", hint: "Browse and export the app's raw AsyncStorage data." },
 ];
 
-/** Unlocked via 14 taps on the app icon in About (see AboutSettingsScreen) -
- * a hub for tools aimed at whoever is testing the app, not end users. */
+/** A mainstream Settings section (no longer a hidden, tap-to-unlock
+ * feature) - tools aimed at whoever is testing the app, not required for
+ * regular use but not worth hiding either. */
 export function DeveloperOptionsScreen({ navigation }: any) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const developerModeUnlocked = useSettingsStore((s) => s.developerModeUnlocked);
-  const setDeveloperModeUnlocked = useSettingsStore((s) => s.setDeveloperModeUnlocked);
   const backendUrl = useSettingsStore((s) => s.backendUrl);
 
-  const turnOff = () => {
-    setDeveloperModeUnlocked(false);
-    navigation.goBack();
+  const sendLogs = async () => {
+    const entries = await getSessionLog();
+    await Share.share({ message: formatSessionLog(entries) });
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Card>
-        <View style={styles.toggleRow}>
-          <View style={styles.rowTextWrap}>
-            <Text style={styles.rowLabel}>Developer Options</Text>
-            <Text style={styles.rowHint}>Turn off to hide this whole section again — find it the same way (14 taps in About) to bring it back.</Text>
-          </View>
-          <Switch
-            value={developerModeUnlocked}
-            onValueChange={(v) => (v ? undefined : turnOff())}
-            trackColor={{ false: colors.border, true: colors.accent }}
-            thumbColor={colors.textPrimary}
-          />
+      <Pressable onPress={sendLogs} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+        <View style={styles.rowTextWrap}>
+          <Text style={styles.rowLabel}>Send Logs</Text>
+          <Text style={styles.rowHint}>
+            Share everything logged on this device (errors, and usage events if Usage Logging is on) via your own
+            share sheet — nothing is sent automatically.
+          </Text>
         </View>
-      </Card>
+        <Text style={styles.rowCaret}>›</Text>
+      </Pressable>
 
       {ROWS.map((row) => (
         <Pressable
@@ -96,7 +92,6 @@ function createStyles(colors: ColorPalette) {
       marginBottom: spacing.sm,
     },
     rowPressed: { backgroundColor: colors.surfaceAlt },
-    toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
     rowTextWrap: { flex: 1, marginRight: spacing.sm },
     rowLabel: { color: colors.textPrimary, fontSize: 15, fontWeight: "600", marginBottom: 2 },
     rowHint: { color: colors.textSecondary, fontSize: 12 },

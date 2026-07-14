@@ -20,14 +20,15 @@ import {
 } from "../state/useProjectStore";
 import { modelPath, isModelDownloaded } from "../services/modelStorage";
 import { ensureLoaded, complete, countTokens, getActiveInferenceUnit } from "../services/llamaEngine";
-import { runFlow, FlowStepResult } from "../services/flowRunner";
+import { runFlow, FlowStepResult, aggregateFlowStats } from "../services/flowRunner";
 import { FlowStepsAccordion } from "../components/FlowStepsAccordion";
 import { useFlowStore } from "../state/useFlowStore";
 import { formatInferenceStats } from "../utils/format";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { showAlert } from "../state/useAlertStore";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../services/fileAttachment";
-import { logFailure } from "../services/errorLog";
+import { logFailure } from "../services/sessionLog";
+import { setKeepAwake } from "../services/keepAwake";
 
 interface ChatMessage {
   id: string;
@@ -96,6 +97,7 @@ export function InferenceScreen({ route, navigation }: any) {
   const createSession = useProjectStore((s) => s.createSession);
   const ensureDefaultSession = useProjectStore((s) => s.ensureDefaultSession);
   const pinSessionUnit = useProjectStore((s) => s.pinSessionUnit);
+  const setSessionFlow = useProjectStore((s) => s.setSessionFlow);
   const showInferenceStats = useSettingsStore((s) => s.showInferenceStats);
   const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
   const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
@@ -150,6 +152,11 @@ export function InferenceScreen({ route, navigation }: any) {
   };
 
   useEffect(() => {
+    setKeepAwake("trunk-inference", running);
+    return () => setKeepAwake("trunk-inference", false);
+  }, [running]);
+
+  useEffect(() => {
     // Also covers the active project being deleted elsewhere (Projects tab
     // stays mounted alongside this one) — without this, activeProjectId
     // keeps pointing at a now-nonexistent project forever, since the guard
@@ -169,6 +176,17 @@ export function InferenceScreen({ route, navigation }: any) {
     const session = ensureDefaultSession(activeProjectId);
     setActiveSessionId(session.id);
   }, [activeProjectId, ensureDefaultSession]);
+
+  // Restores whichever Flow (or Direct chat, if none) this session was last
+  // using - covers both the initial mount/project-change path above and
+  // manually switching sessions via the Chat picker. Without this,
+  // activeFlowId always started at undefined, silently reverting every
+  // session to Direct chat on every app restart even if it had been using
+  // a Flow.
+  useEffect(() => {
+    const session = sessions.find((s) => s.id === activeSessionId);
+    setActiveFlowId(session?.flowId);
+  }, [activeSessionId, sessions]);
 
   useEffect(() => {
     setPlaceholder(randomPlaceholder());
@@ -392,11 +410,15 @@ export function InferenceScreen({ route, navigation }: any) {
         // the project's own generation settings win over the flow's own
         // stored ones, since the flow here is just choosing the agent
         // chain, not a separately-configured thing (see FlowRunOverrides).
+        // Collected locally (not read back from React state) since setState
+        // updates aren't visible synchronously right after runFlow resolves.
+        const collectedSteps: FlowStepResult[] = [];
         const result = await runFlow(
           activeFlow,
           agents,
           messageContent,
           (step) => {
+            collectedSteps.push(step);
             setFlowSteps((cur) => [...cur, step]);
             setActiveFlowStep(null);
           },
@@ -412,16 +434,17 @@ export function InferenceScreen({ route, navigation }: any) {
           }
         );
         pinSessionUnit(sessionId, npuAcceleration, gpuAcceleration);
+        const aggregate = aggregateFlowStats(collectedSteps);
         addHistoryEntry({
           projectId: activeProject.id,
           sessionId,
           prompt: trimmedPrompt,
           response: result,
-          tokensGenerated: 0,
-          tokensPerSecond: 0,
-          promptTokens: 0,
-          promptTokensPerSecond: 0,
-          totalMs: 0,
+          tokensGenerated: aggregate.tokens,
+          tokensPerSecond: aggregate.tokensPerSecond,
+          promptTokens: aggregate.promptTokens,
+          promptTokensPerSecond: aggregate.promptTokensPerSecond,
+          totalMs: aggregate.totalMs,
           viaFlowId: activeFlow.id,
         });
         return;
@@ -593,7 +616,11 @@ export function InferenceScreen({ route, navigation }: any) {
         title="Run via Flow"
         options={[{ label: "Direct chat (no Flow)", value: NO_FLOW_VALUE }, ...flows.map((f) => ({ label: f.name, value: f.id }))]}
         selectedValue={activeFlowId ?? NO_FLOW_VALUE}
-        onSelect={(value) => setActiveFlowId(value === NO_FLOW_VALUE ? undefined : value)}
+        onSelect={(value) => {
+          const flowId = value === NO_FLOW_VALUE ? undefined : value;
+          setActiveFlowId(flowId);
+          if (activeSessionId) setSessionFlow(activeSessionId, flowId);
+        }}
         onClose={() => setFlowPickerOpen(false)}
         emptyLabel="No saved flows yet."
         emptyLinkLabel="Build one in Playground ›"
@@ -637,7 +664,11 @@ export function InferenceScreen({ route, navigation }: any) {
                 id: s.nodeId,
                 agentName: s.agentName,
                 output: s.output,
+                promptTokens: s.stats.promptTokens,
+                tokensGenerated: s.stats.tokens,
+                promptTokensPerSecond: s.stats.promptTokensPerSecond,
                 tokensPerSecond: s.stats.tokensPerSecond,
+                totalMs: s.stats.totalMs,
               }))}
               activeStep={activeFlowStep}
             />

@@ -29,3 +29,8 @@ Thumbs.db
 
 # Built APKs — large binaries, never committed
 *.apk
+releases/
+
+# Personal working notes — never committed
+LINKEDIN_POST.md
+PROJECT_RULES.md

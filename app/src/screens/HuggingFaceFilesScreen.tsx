@@ -56,6 +56,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(true);
   const downloads = useDownloadStore((s) => s.downloads);
   const activeDownload = Object.values(downloads).find((d) => d.status === "downloading");
+  const failedDownload = Object.values(downloads).find((d) => d.status === "failed");
   const { status: backendStatus, retry: retryBackend } = useBackendHealth();
 
   const load = useCallback(async () => {
@@ -89,10 +90,11 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
   const startDownload = async (file: FileRow) => {
     if (!(await canProceedWithDownload(file.filename))) return;
 
-    const handle = downloadModel(huggingfaceApi.downloadUrl(repoId, file.filename), file.filename, (fraction) => {
+    const url = huggingfaceApi.downloadUrl(repoId, file.filename);
+    const handle = downloadModel(url, file.filename, (fraction) => {
       reportDownloadProgress(file.filename, fraction);
     });
-    useDownloadStore.getState().beginDownload(file.filename, handle.cancel);
+    useDownloadStore.getState().beginDownload(file.filename, url, handle.cancel);
 
     handle.done
       .then(async () => {
@@ -113,9 +115,18 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
       })
       .catch((err) => {
         stopTrackingDownload(file.filename);
+        // The failed entry stays in the store (not cleared) so the banner
+        // below survives even if this alert is missed - dismiss/retry both
+        // route through it instead of only existing in this one-shot alert.
         useDownloadStore.getState().setFailed(file.filename, String(err));
         showAlert("Download failed", String(err));
       });
+  };
+
+  const retryDownload = (filename: string) => {
+    useDownloadStore.getState().clearDownload(filename);
+    const file = files.find((f) => f.filename === filename);
+    if (file) startDownload(file);
   };
 
   const confirmDownload = (file: FileRow) => {
@@ -199,6 +210,25 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
         </View>
       ) : null}
 
+      {failedDownload ? (
+        <View style={styles.failedCard}>
+          <Text style={styles.failedLabel} numberOfLines={1}>
+            {failedDownload.filename} — download failed
+          </Text>
+          <Text style={styles.failedMessage} numberOfLines={2}>
+            {failedDownload.error}
+          </Text>
+          <View style={styles.progressRow}>
+            <Button
+              label="Dismiss"
+              variant="neutral"
+              onPress={() => useDownloadStore.getState().clearDownload(failedDownload.filename)}
+            />
+            <Button label="Retry" variant="secondary" onPress={() => retryDownload(failedDownload.filename)} />
+          </View>
+        </View>
+      ) : null}
+
       <FlatList
         data={files}
         keyExtractor={(item) => item.filename}
@@ -254,5 +284,8 @@ function createStyles(colors: ColorPalette) {
     progressFill: { height: 6, backgroundColor: colors.accent },
     progressRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     progressText: { color: colors.textSecondary, fontSize: 11, fontFamily: "monospace" },
+    failedCard: { borderWidth: 1, borderColor: colors.error, backgroundColor: colors.surface, padding: spacing.md, marginBottom: spacing.md },
+    failedLabel: { color: colors.error, fontSize: 12, fontFamily: "monospace", fontWeight: "700", marginBottom: 2 },
+    failedMessage: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
   });
 }

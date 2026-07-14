@@ -13,6 +13,22 @@ export interface LocalModel {
 
 const MODELS_DIR = `${FileSystem.documentDirectory}models/`;
 
+// An "mmproj" file is a multimodal vision projector meant to pair with a
+// separate main model - it has no text-generation architecture of its own,
+// so initLlama() always fails on it as a standalone model. A user can still
+// end up with one downloaded (some HF repos list it alongside the real
+// model with a similar name), so it stays visible in the Models tab for
+// management/deletion, but every model *picker* (Project, Flow, Agent
+// Craft-with-AI) should filter it out rather than let it be picked and
+// fail with a confusing "Failed to load model" error.
+export function isUsableChatModel(filename: string): boolean {
+  return !/mmproj/i.test(filename);
+}
+
+export function filterUsableChatModels(models: LocalModel[]): LocalModel[] {
+  return models.filter((m) => isUsableChatModel(m.filename));
+}
+
 async function ensureModelsDir(): Promise<void> {
   const info = await FileSystem.getInfoAsync(MODELS_DIR);
   if (!info.exists) {

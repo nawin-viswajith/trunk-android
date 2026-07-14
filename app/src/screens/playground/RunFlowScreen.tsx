@@ -8,12 +8,13 @@ import { MarkdownText } from "../../components/MarkdownText";
 import { ContextWindowMeter } from "../../components/ContextWindowMeter";
 import { AttachmentChip } from "../../components/AttachmentChip";
 import { FlowStepsAccordion } from "../../components/FlowStepsAccordion";
-import { runFlow, FlowProgress, FlowStepResult } from "../../services/flowRunner";
+import { runFlow, FlowProgress, FlowStepResult, aggregateFlowStats } from "../../services/flowRunner";
 import { selectFlow, useFlowStore } from "../../state/useFlowStore";
 import { ensureLoaded, countTokens, getActiveInferenceUnit } from "../../services/llamaEngine";
 import { modelPath } from "../../services/modelStorage";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../../services/fileAttachment";
-import { logFailure } from "../../services/errorLog";
+import { logFailure } from "../../services/sessionLog";
+import { setKeepAwake } from "../../services/keepAwake";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { useProjectStore } from "../../state/useProjectStore";
 import { showAlert } from "../../state/useAlertStore";
@@ -42,7 +43,13 @@ export function RunFlowScreen({ route, navigation }: any) {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
-  const [liveTokenEstimate, setLiveTokenEstimate] = useState(0);
+  // Tokens the most recent run actually used (prompt + completion, summed
+  // across every step) - each Run is an independent single-shot completion,
+  // not a carried-over conversation, so "used" means "the last run's total"
+  // rather than an ever-growing sum across runs.
+  const [usedTokenEstimate, setUsedTokenEstimate] = useState(0);
+  // Debounced live estimate of the current, not-yet-run input.
+  const [draftTokenEstimate, setDraftTokenEstimate] = useState(0);
   const [inferenceUnit, setInferenceUnit] = useState<string | null>(null);
   const listRef = useRef<ScrollView>(null);
   // Same reasoning as InferenceScreen: streaming steps grow the content
@@ -57,6 +64,11 @@ export function RunFlowScreen({ route, navigation }: any) {
   const scrollToEndIfNearBottom = () => {
     if (isNearBottomRef.current) listRef.current?.scrollToEnd({ animated: true });
   };
+
+  useEffect(() => {
+    setKeepAwake("trunk-runflow", running);
+    return () => setKeepAwake("trunk-runflow", false);
+  }, [running]);
 
   useEffect(() => {
     // Same approach as InferenceScreen: tab bar hides on keyboard
@@ -91,13 +103,13 @@ export function RunFlowScreen({ route, navigation }: any) {
     const attachmentText = attachment ? formatAttachmentForPrompt(attachment) + "\n\n" : "";
     const candidateText = attachmentText + input;
     if (!candidateText.trim()) {
-      setLiveTokenEstimate(0);
+      setDraftTokenEstimate(0);
       return;
     }
     let cancelled = false;
     const timer = setTimeout(() => {
       countTokens(candidateText).then((count) => {
-        if (!cancelled) setLiveTokenEstimate(count);
+        if (!cancelled) setDraftTokenEstimate(count);
       });
     }, 400);
     return () => {
@@ -146,12 +158,16 @@ export function RunFlowScreen({ route, navigation }: any) {
     // scrolled up to read an earlier one - only mid-generation growth
     // should respect a manual scroll-up, not the moment Run is pressed.
     isNearBottomRef.current = true;
+    // Collected locally (not read back from React state) since setState
+    // updates aren't visible synchronously right after runFlow resolves.
+    const collectedSteps: FlowStepResult[] = [];
     try {
       const result = await runFlow(
         flow,
         agents,
         initialInput,
         (step) => {
+          collectedSteps.push(step);
           setSteps((cur) => [...cur, step]);
           setActiveStep(null);
           requestAnimationFrame(scrollToEndIfNearBottom);
@@ -162,6 +178,8 @@ export function RunFlowScreen({ route, navigation }: any) {
         }
       );
       setFinalResult(result);
+      const aggregate = aggregateFlowStats(collectedSteps);
+      setUsedTokenEstimate(aggregate.promptTokens + aggregate.tokens);
     } catch (err) {
       logFailure("Playground flow run", err);
       setError(String(err));
@@ -210,7 +228,16 @@ export function RunFlowScreen({ route, navigation }: any) {
          * result (below) is meant to be read at a glance; these are the
          * "show your work" steps behind it. */}
         <FlowStepsAccordion
-          steps={steps.map((s) => ({ id: s.nodeId, agentName: s.agentName, output: s.output, tokensPerSecond: s.stats.tokensPerSecond }))}
+          steps={steps.map((s) => ({
+            id: s.nodeId,
+            agentName: s.agentName,
+            output: s.output,
+            promptTokens: s.stats.promptTokens,
+            tokensGenerated: s.stats.tokens,
+            promptTokensPerSecond: s.stats.promptTokensPerSecond,
+            tokensPerSecond: s.stats.tokensPerSecond,
+            totalMs: s.stats.totalMs,
+          }))}
           activeStep={activeStep ? { agentName: activeStep.agentName, partialText: activeStep.partialText } : null}
         />
 
@@ -229,7 +256,12 @@ export function RunFlowScreen({ route, navigation }: any) {
 
       <View style={styles.composer}>
         {flow.contextLength ? (
-          <ContextWindowMeter usedTokens={liveTokenEstimate} maxTokens={flow.contextLength} unit={inferenceUnit ?? undefined} />
+          <ContextWindowMeter
+            usedTokens={usedTokenEstimate}
+            draftTokens={draftTokenEstimate}
+            maxTokens={flow.contextLength}
+            unit={inferenceUnit ?? undefined}
+          />
         ) : null}
         {attachment ? (
           <AttachmentChip name={attachment.name} truncated={attachment.truncated} onRemove={() => setAttachment(null)} />
@@ -249,7 +281,7 @@ export function RunFlowScreen({ route, navigation }: any) {
             editable={!running}
           />
           <Button
-            label={running ? "Running..." : "▶"}
+            label={running ? "Running..." : "â–¶"}
             onPress={run}
             variant="primary"
             loading={running}

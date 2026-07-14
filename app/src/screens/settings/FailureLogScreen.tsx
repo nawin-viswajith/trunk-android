@@ -7,25 +7,25 @@ import { Card } from "../../components/Card";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { useColors } from "../../theme/ThemeContext";
 import { createScreenStyles } from "../../theme/layout";
-import { getFailureLog, clearFailureLog, formatFailureLog, LoggedFailure } from "../../services/errorLog";
+import { getSessionLog, clearErrorLog, formatSessionLog, LogEntry } from "../../services/sessionLog";
 
 export function FailureLogScreen() {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const [entries, setEntries] = useState<LoggedFailure[]>([]);
+  const [entries, setEntries] = useState<LogEntry[]>([]);
 
   const load = useCallback(() => {
-    getFailureLog().then(setEntries);
+    getSessionLog().then((all) => setEntries(all.filter((e) => e.kind === "error")));
   }, []);
 
   useFocusEffect(load);
 
   const share = async () => {
-    await Share.share({ message: formatFailureLog(entries) });
+    await Share.share({ message: formatSessionLog(entries) });
   };
 
   const clear = async () => {
-    await clearFailureLog();
+    await clearErrorLog();
     setEntries([]);
   };
 

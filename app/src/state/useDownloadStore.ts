@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { downloadModel } from "../services/modelStorage";
 
 export type DownloadStatus = "downloading" | "failed";
 
@@ -10,11 +11,16 @@ export interface DownloadEntry {
   status: DownloadStatus;
   error?: string;
   cancel: () => Promise<void>;
+  /** The direct download URL this entry came from — kept around so a failed
+   * download can be retried from screens (ModelsScreen, HomeScreen) that
+   * only see the shared store, not the original HuggingFaceFilesScreen
+   * repo/file context that started it. */
+  url: string;
 }
 
 interface DownloadStoreState {
   downloads: Record<string, DownloadEntry>;
-  beginDownload: (filename: string, cancel: () => Promise<void>) => void;
+  beginDownload: (filename: string, url: string, cancel: () => Promise<void>) => void;
   commitProgress: (filename: string, progress: number) => void;
   setFailed: (filename: string, error: string) => void;
   clearDownload: (filename: string) => void;
@@ -22,9 +28,9 @@ interface DownloadStoreState {
 
 export const useDownloadStore = create<DownloadStoreState>((set) => ({
   downloads: {},
-  beginDownload: (filename, cancel) =>
+  beginDownload: (filename, url, cancel) =>
     set((state) => ({
-      downloads: { ...state.downloads, [filename]: { filename, progress: 0, status: "downloading", cancel } },
+      downloads: { ...state.downloads, [filename]: { filename, progress: 0, status: "downloading", cancel, url } },
     })),
   commitProgress: (filename, progress) =>
     set((state) => {
@@ -79,4 +85,27 @@ export function stopTrackingDownload(filename: string): void {
   if (timer) clearInterval(timer);
   flushTimers.delete(filename);
   latestRawProgress.delete(filename);
+}
+
+/** Re-attempts a failed download from whichever screen shows the failed
+ * banner (ModelsScreen, HomeScreen) without needing the originating repo
+ * browse context — the entry's own stored url is enough. Does not re-record
+ * the model's source repo (that already happened, or didn't, on the
+ * original attempt); a retry is the same download, not a fresh browse. */
+export function retryFailedDownload(filename: string): void {
+  const entry = useDownloadStore.getState().downloads[filename];
+  if (!entry) return;
+  const handle = downloadModel(entry.url, filename, (fraction) => {
+    reportDownloadProgress(filename, fraction);
+  });
+  useDownloadStore.getState().beginDownload(filename, entry.url, handle.cancel);
+  handle.done
+    .then(() => {
+      stopTrackingDownload(filename);
+      useDownloadStore.getState().clearDownload(filename);
+    })
+    .catch((err) => {
+      stopTrackingDownload(filename);
+      useDownloadStore.getState().setFailed(filename, String(err));
+    });
 }
