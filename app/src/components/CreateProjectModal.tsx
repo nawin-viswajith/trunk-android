@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { TextInput } from "./TextInput";
 import { Button } from "./Button";
@@ -71,9 +71,13 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
-      <Pressable style={styles.backdrop} onPress={close}>
-        <Pressable style={styles.card} onPress={() => {}}>
-          <ScrollView bounces={false}>
+      {/* Without this, a plain centered Modal doesn't reposition for the
+       * keyboard on Android — the Context/Max tokens fields further down
+       * the form were getting hidden behind it with no way to reach them. */}
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <Pressable style={styles.backdropTouchable} onPress={close}>
+          <Pressable style={styles.card} onPress={() => {}}>
+            <ScrollView bounces={false}>
             <Text style={styles.title}>New Project</Text>
 
             <Text style={styles.label}>Name</Text>
@@ -162,9 +166,10 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
                 <Button label="Create" onPress={create} variant="secondary" disabled={!name.trim()} />
               </View>
             </View>
-          </ScrollView>
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -174,6 +179,9 @@ function createStyles(colors: ColorPalette) {
     backdrop: {
       flex: 1,
       backgroundColor: "rgba(0,0,0,0.6)",
+    },
+    backdropTouchable: {
+      flex: 1,
       justifyContent: "center",
       padding: spacing.lg,
     },
