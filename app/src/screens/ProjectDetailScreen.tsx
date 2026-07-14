@@ -197,7 +197,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
               onPress={() => navigation.navigate("Inference", { projectId })}
               style={({ pressed }) => [styles.playButton, pressed && styles.playButtonPressed]}
             >
-              <Text style={styles.playButtonLabel}>â–¶ Run</Text>
+              <Text style={styles.playButtonLabel}>{"\u25B6"} Run</Text>
             </Pressable>
           ) : null}
         </View>

@@ -281,7 +281,7 @@ export function RunFlowScreen({ route, navigation }: any) {
             editable={!running}
           />
           <Button
-            label={running ? "Running..." : "â–¶"}
+            label={running ? "Running..." : "\u25B6 Run"}
             onPress={run}
             variant="primary"
             loading={running}

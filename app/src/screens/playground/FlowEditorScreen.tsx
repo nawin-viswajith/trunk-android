@@ -182,7 +182,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
           disabled={!canRun}
           style={({ pressed }) => [styles.runButton, !canRun && styles.runButtonDisabled, pressed && canRun && styles.runButtonPressed]}
         >
-          <Text style={[styles.runButtonLabel, !canRun && styles.runButtonLabelDisabled]}>▶ Run</Text>
+          <Text style={[styles.runButtonLabel, !canRun && styles.runButtonLabelDisabled]}>{"\u25B6"} Run</Text>
         </Pressable>
       </View>
 
