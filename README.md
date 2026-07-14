@@ -86,8 +86,10 @@ uvicorn app.main:app --reload
 5. **Playground** - build reusable **Agents** (a name + system prompt,
    hand-written or drafted by the loaded model from a plain-language
    description) and wire several into a linear **Flow**, chaining each
-   agent's output into the next agent's input. Running a flow streams each
-   step live and shows step-by-step + final output.
+   agent's output into the next agent's input. Each Flow has its own
+   generation settings (temperature, top-p, top-k, context length, max
+   tokens). Running a flow streams each step live (collapsed by default,
+   tap to expand) and shows real per-step and aggregate token stats.
 6. **Inference** - chat with a project's model, or run a saved Flow instead;
    runs fully on-device via `llama.rn`. Multiple chat sessions per project,
    prior turns are replayed as context, markdown (code blocks, inline code,
@@ -103,9 +105,22 @@ bar.
   choice" checkbox on the in-context prompt that writes back to this setting.
 - **Lite Mode** - caps the CPU threads used for generation to save
   battery/heat, at the cost of speed; shows a one-time warning when enabled.
+- **NPU / GPU Acceleration** - experimental offload to a Hexagon NPU or
+  Adreno GPU on supported Qualcomm chipsets, mutually exclusive with each
+  other; silently has no effect on unsupported hardware.
+- **Keep Screen On** - prevents the screen sleeping while a model downloads
+  or a response generates. Off by default.
 - **Background running** - a one-tap shortcut to Android's "ignore battery
   optimizations" dialog, so long downloads/inference are less likely to be
   paused while the app is backgrounded.
+- **Usage Logging** - opt-in, off by default. Shows an explicit consent
+  screen the first time it's enabled (what's collected, what never is - your
+  prompts and responses are never included). Errors are always logged
+  locally regardless of this setting. **Developer Options → Send Logs**
+  shares everything logged via your own share sheet; nothing is ever sent
+  automatically.
+- **Developer Options** - a mainstream Settings section: test suite, failure
+  log, storage inspector, and Send Logs.
 
 ## Design system
 
@@ -122,9 +137,12 @@ drift apart.
 - GGUF only (the format `llama.cpp`/`llama.rn` understand).
 - No multimodal (image/audio) support yet - `llama.rn` supports it via a
   separate "mmproj" projector file paired with the main model, but the
-  download/import flow and chat UI don't handle that pairing yet.
+  chat UI doesn't handle that pairing yet. mmproj files can be downloaded
+  and managed in Models, but are filtered out of every model picker (Agent,
+  Flow, Project) since they can't load as a standalone chat model.
 - No Hugging Face account/curation features on the backend yet - it's
   intentionally minimal for now.
 - Downloaded models aren't linked back to their source Hugging Face repo,
   so there's no in-app README/description view for a model once saved -
   only filename, quant, size, and date added.
+- Flows are linear chains only (A → B → C) - no branching or merging.
