@@ -388,6 +388,10 @@ export function InferenceScreen({ route, navigation }: any) {
         : trimmedPrompt;
 
       if (activeFlow) {
+        // Run via Flow happens inside this project's Inference session -
+        // the project's own generation settings win over the flow's own
+        // stored ones, since the flow here is just choosing the agent
+        // chain, not a separately-configured thing (see FlowRunOverrides).
         const result = await runFlow(
           activeFlow,
           agents,
@@ -396,8 +400,18 @@ export function InferenceScreen({ route, navigation }: any) {
             setFlowSteps((cur) => [...cur, step]);
             setActiveFlowStep(null);
           },
-          (progress) => setActiveFlowStep({ agentName: progress.agentName, partialText: progress.partialText })
+          (progress) => setActiveFlowStep({ agentName: progress.agentName, partialText: progress.partialText }),
+          {
+            contextLength: activeProject.contextLength,
+            temperature: activeProject.temperature,
+            topP: activeProject.topP,
+            topK: activeProject.topK,
+            maxTokens: activeProject.maxTokens,
+            npuAcceleration: effectiveNpuAcceleration,
+            gpuAcceleration: effectiveGpuAcceleration,
+          }
         );
+        pinSessionUnit(sessionId, npuAcceleration, gpuAcceleration);
         addHistoryEntry({
           projectId: activeProject.id,
           sessionId,
