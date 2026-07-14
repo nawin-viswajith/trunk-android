@@ -18,6 +18,23 @@ export interface FlowProgress {
   partialText: string;
 }
 
+/** Overrides the flow's own stored generation settings for this run only -
+ * used when a flow is run from inside a Project's Inference session ("Run
+ * via Flow"), where the project's own settings should win, since the flow
+ * there is just choosing which agent chain handles the message, not a
+ * standalone thing with its own separate configuration. A flow run
+ * directly from Playground (no project involved) passes none of this, so
+ * the flow's own settings apply as normal. */
+export interface FlowRunOverrides {
+  contextLength?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  maxTokens?: number;
+  npuAcceleration?: boolean;
+  gpuAcceleration?: boolean;
+}
+
 // A small/quantized model given a long, heavily-structured system prompt
 // (e.g. a "Craft with AI" COSTAR-formatted persona, with its own labeled
 // Context/Objective/Style/... sections) will sometimes confuse "instructions
@@ -60,12 +77,23 @@ export async function runFlow(
   agents: Agent[],
   initialInput: string,
   onStep: (result: FlowStepResult) => void,
-  onProgress?: (progress: FlowProgress) => void
+  onProgress?: (progress: FlowProgress) => void,
+  overrides?: FlowRunOverrides
 ): Promise<string> {
   if (!flow.modelFilename) throw new Error("This flow has no model assigned yet.");
   if (!flow.startNodeId) throw new Error("This flow has no start node — add an agent to the canvas first.");
 
-  await ensureLoaded(modelPath(flow.modelFilename), { contextLength: flow.contextLength });
+  const contextLength = overrides?.contextLength ?? flow.contextLength;
+  const temperature = overrides?.temperature ?? flow.temperature;
+  const topP = overrides?.topP ?? flow.topP;
+  const topK = overrides?.topK ?? flow.topK;
+  const maxTokens = overrides?.maxTokens ?? flow.maxTokens;
+
+  await ensureLoaded(modelPath(flow.modelFilename), {
+    contextLength,
+    npuAcceleration: overrides?.npuAcceleration,
+    gpuAcceleration: overrides?.gpuAcceleration,
+  });
 
   const nodesById = new Map(flow.nodes.map((n) => [n.id, n]));
   const agentsById = new Map(agents.map((a) => [a.id, a]));
@@ -92,10 +120,10 @@ export async function runFlow(
           { role: "system", content: agent.systemPrompt },
           { role: "user", content: stepInput },
         ],
-        temperature: flow.temperature,
-        topP: flow.topP,
-        topK: flow.topK,
-        maxTokens: flow.maxTokens,
+        temperature,
+        topP,
+        topK,
+        maxTokens,
       },
       (token) => {
         partialText += token;

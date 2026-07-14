@@ -15,6 +15,8 @@ import { modelPath } from "../../services/modelStorage";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../../services/fileAttachment";
 import { logFailure } from "../../services/errorLog";
 import { useSettingsStore } from "../../state/useSettingsStore";
+import { useProjectStore } from "../../state/useProjectStore";
+import { showAlert } from "../../state/useAlertStore";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
@@ -29,6 +31,7 @@ export function RunFlowScreen({ route, navigation }: any) {
   const agents = useFlowStore((s) => s.agents);
   const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
   const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
+  const createProject = useProjectStore((s) => s.createProject);
 
   const [input, setInput] = useState("");
   const [running, setRunning] = useState(false);
@@ -113,6 +116,21 @@ export function RunFlowScreen({ route, navigation }: any) {
     }
   };
 
+  // Flow runs are a quick test surface, not a saved conversation - nothing
+  // here (input, steps, final result) survives leaving this screen. This is
+  // the one bridge to somewhere that does persist: a Project bound to the
+  // same model, with its own full generation-settings editor (a Flow has no
+  // UI for its own contextLength/temperature/etc. today - it just runs on
+  // fixed createFlow defaults).
+  const onAddToProject = () => {
+    if (!flow?.modelFilename) return;
+    const project = createProject(flow.name, flow.modelFilename);
+    showAlert("Project created", `"${project.name}" is ready in Projects, bound to the same model - chat there to keep history.`, [
+      { label: "Go there", onPress: () => navigation.navigate("Projects", { screen: "Project Detail", params: { projectId: project.id } }) },
+      { label: "Stay here" },
+    ]);
+  };
+
   if (!flow) return null;
 
   const run = async () => {
@@ -162,6 +180,11 @@ export function RunFlowScreen({ route, navigation }: any) {
         <Text style={styles.flowName} numberOfLines={1}>
           {flow.name}
         </Text>
+        {flow.modelFilename ? (
+          <Pressable onPress={onAddToProject} hitSlop={8} style={styles.addToProjectButton}>
+            <Text style={styles.addToProjectLabel}>+ Project</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView
@@ -176,6 +199,10 @@ export function RunFlowScreen({ route, navigation }: any) {
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyTitle}>Ready to run</Text>
             <Text style={styles.emptySubtitle}>Enter an input below to start the chain.</Text>
+            <Text style={styles.emptyNote}>
+              This is a temporary test run for the flow - nothing here is saved. Tap "+ Project" above to keep chatting
+              with this model in a real, saved conversation.
+            </Text>
           </View>
         ) : null}
 
@@ -251,11 +278,25 @@ function createStyles(colors: ColorPalette) {
     backButton: { paddingHorizontal: spacing.sm },
     backButtonLabel: { color: colors.accent, fontSize: 28, fontWeight: "700" },
     flowName: { flex: 1, color: colors.textPrimary, fontSize: 16, fontWeight: "700", marginHorizontal: spacing.sm },
+    addToProjectButton: {
+      borderWidth: 1,
+      borderColor: colors.accent,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+    },
+    addToProjectLabel: { color: colors.accent, fontSize: 12, fontWeight: "700" },
     list: { flex: 1 },
     listContent: { padding: spacing.md, paddingBottom: spacing.xl },
     emptyWrap: { alignItems: "center", marginTop: spacing.xl, gap: spacing.xs },
     emptyTitle: { color: colors.textPrimary, fontSize: 18, fontWeight: "700" },
     emptySubtitle: { color: colors.textSecondary, fontSize: 13, textAlign: "center" },
+    emptyNote: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textAlign: "center",
+      marginTop: spacing.md,
+      paddingHorizontal: spacing.lg,
+    },
     stepCard: {
       borderWidth: 1,
       borderColor: colors.border,
@@ -317,6 +358,7 @@ function createStyles(colors: ColorPalette) {
       backgroundColor: colors.surfaceAlt,
       paddingVertical: spacing.sm,
       paddingHorizontal: spacing.sm,
+      minHeight: 44,
       maxHeight: 100,
     },
   });

@@ -119,10 +119,26 @@ if (System.getProperty('os.name').toLowerCase().contains('windows')) {
 }
 ```
 
+## 4. `largeHeap` (`android/app/src/main/AndroidManifest.xml`)
+
+A loaded GGUF model's native context can resident several hundred MB to a
+few GB - without this, Android's default per-app memory ceiling makes a
+backgrounded Trunk process one of the first candidates the low-memory
+killer reclaims, closing the app just from minimizing it. Not exposed by
+`expo-build-properties` (checked its Android options - no `largeHeap`
+field), so this is a manifest hand-edit like the others here, not
+something `app.json` can express. Add `android:largeHeap="true"` to the
+`<application ...>` tag:
+
+```xml
+<application android:name=".MainApplication" ... android:largeHeap="true">
+```
+
 ## Verifying after reapplying
 
 ```bash
 grep -c "hasReleaseKeystore" android/app/build.gradle   # expect 4
 grep -c "rncxx" android/app/build.gradle android/build.gradle   # expect 1 each
 grep -c "splits" android/app/build.gradle   # expect 1
+grep -c "largeHeap" android/app/src/main/AndroidManifest.xml   # expect 1
 ```

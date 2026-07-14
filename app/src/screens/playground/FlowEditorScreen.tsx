@@ -13,6 +13,8 @@ import { NODE_WIDTH, NODE_HEIGHT } from "../../components/flow/FlowNodeView";
 import { listLocalModels, LocalModel } from "../../services/modelStorage";
 import { selectAgent, selectFlow, useFlowStore } from "../../state/useFlowStore";
 import { useSuppressTabSwipe } from "../../navigation/SwipeableScreen";
+import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../../utils/inferenceParams";
+import { showAlert } from "../../state/useAlertStore";
 import { ColorPalette, spacing } from "../../theme/colors";
 import { createScreenStyles } from "../../theme/layout";
 import { useColors } from "../../theme/ThemeContext";
@@ -81,9 +83,26 @@ export function FlowEditorScreen({ route, navigation }: any) {
 
   const [models, setModels] = useState<LocalModel[]>([]);
   const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [addAgentOpen, setAddAgentOpen] = useState(false);
   const [actionSheetNodeId, setActionSheetNodeId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const [temperature, setTemperature] = useState(String(flow?.temperature ?? 0.7));
+  const [topP, setTopP] = useState(String(flow?.topP ?? 0.9));
+  const [topK, setTopK] = useState(String(flow?.topK ?? 40));
+  const [contextLength, setContextLength] = useState(String(flow?.contextLength ?? 2048));
+  const [maxTokens, setMaxTokens] = useState(String(flow?.maxTokens ?? 512));
+  const [justApplied, setJustApplied] = useState(false);
+
+  useEffect(() => {
+    if (!flow) return;
+    setTemperature(String(flow.temperature));
+    setTopP(String(flow.topP));
+    setTopK(String(flow.topK));
+    setContextLength(String(flow.contextLength));
+    setMaxTokens(String(flow.maxTokens));
+  }, [flow?.id]);
   const viewportRef = useRef({ offset: { x: 0, y: 0 }, width: 0, height: 0 });
 
   // A fast pan across the canvas can otherwise register as a fling on the
@@ -102,6 +121,25 @@ export function FlowEditorScreen({ route, navigation }: any) {
   const assignModel = (filename: string) => {
     updateFlow(flow.id, { modelFilename: filename });
     setModelPickerOpen(false);
+  };
+
+  // Only applies when this flow is run standalone from here or Run Flow -
+  // "Run via Flow" inside a Project's Inference session uses that
+  // project's own settings instead (see FlowRunOverrides in flowRunner.ts).
+  const applyParams = () => {
+    const parsed = parseInferenceParams({ temperature, topP, topK, contextLength, maxTokens });
+    if (!parsed) {
+      showAlert("Invalid values", INFERENCE_PARAM_HINT);
+      return;
+    }
+    updateFlow(flow.id, parsed);
+    setJustApplied(true);
+    setTimeout(() => setJustApplied(false), 1800);
+  };
+
+  const onParamFieldChange = (setter: (v: string) => void) => (value: string) => {
+    setJustApplied(false);
+    setter(value);
   };
 
   const handleAddAgent = (agentId: string) => {
@@ -193,6 +231,64 @@ export function FlowEditorScreen({ route, navigation }: any) {
           })}
           {models.length === 0 ? <Text style={styles.modelEmpty}>No models downloaded yet.</Text> : null}
         </ScrollView>
+      ) : null}
+
+      <Pressable onPress={() => setSettingsOpen((v) => !v)} style={styles.modelChip}>
+        <Text style={styles.modelChipEyebrow}>SETTINGS</Text>
+        <Text style={styles.modelChipLabel} numberOfLines={1}>
+          temp {flow.temperature} · topP {flow.topP} · topK {flow.topK} · ctx {flow.contextLength} · max {flow.maxTokens}
+        </Text>
+        <Text style={styles.modelChipCaret}>{settingsOpen ? "▲" : "▼"}</Text>
+      </Pressable>
+
+      {settingsOpen ? (
+        <View style={styles.settingsPanel}>
+          <Text style={styles.settingsNote}>
+            Only used when this flow runs standalone (here or Run Flow) - a project's own settings win when running via
+            Flow from its Inference chat.
+          </Text>
+          <View style={styles.paramRow}>
+            <Text style={styles.paramLabel}>Temperature</Text>
+            <TextInput
+              value={temperature}
+              onChangeText={onParamFieldChange(setTemperature)}
+              keyboardType="decimal-pad"
+              style={styles.paramInput}
+            />
+          </View>
+          <View style={styles.paramRow}>
+            <Text style={styles.paramLabel}>Top P</Text>
+            <TextInput value={topP} onChangeText={onParamFieldChange(setTopP)} keyboardType="decimal-pad" style={styles.paramInput} />
+          </View>
+          <View style={styles.paramRow}>
+            <Text style={styles.paramLabel}>Top K</Text>
+            <TextInput value={topK} onChangeText={onParamFieldChange(setTopK)} keyboardType="number-pad" style={styles.paramInput} />
+          </View>
+          <View style={styles.paramRow}>
+            <Text style={styles.paramLabel}>Context length</Text>
+            <TextInput
+              value={contextLength}
+              onChangeText={onParamFieldChange(setContextLength)}
+              keyboardType="number-pad"
+              style={styles.paramInput}
+            />
+          </View>
+          <View style={styles.paramRow}>
+            <Text style={styles.paramLabel}>Max tokens</Text>
+            <TextInput
+              value={maxTokens}
+              onChangeText={onParamFieldChange(setMaxTokens)}
+              keyboardType="number-pad"
+              style={styles.paramInput}
+            />
+          </View>
+          <Button
+            label={justApplied ? "Applied ✓" : "Apply Settings"}
+            onPress={applyParams}
+            variant={justApplied ? "primary" : "secondary"}
+            disabled={justApplied}
+          />
+        </View>
       ) : null}
 
       <FlowCanvas
@@ -335,6 +431,25 @@ function createStyles(colors: ColorPalette) {
     modelChipLabel: { flex: 1, color: colors.textPrimary, fontSize: 13, fontWeight: "600", fontFamily: "monospace", marginRight: spacing.sm },
     modelChipLabelWarning: { color: colors.error },
     modelChipCaret: { color: colors.textSecondary, fontSize: 10 },
+    settingsPanel: {
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      padding: spacing.md,
+    },
+    settingsNote: { color: colors.textSecondary, fontSize: 11, marginBottom: spacing.sm },
+    paramRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.sm },
+    paramLabel: { color: colors.textSecondary, fontSize: 13, width: 110 },
+    paramInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      color: colors.textPrimary,
+      backgroundColor: colors.surfaceAlt,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      fontFamily: "monospace",
+    },
     modelList: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
     modelOption: {
       flexDirection: "row",
