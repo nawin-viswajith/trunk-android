@@ -27,6 +27,38 @@ const SLIDES = [
 
 type Phase = "slides" | "warning" | "deviceWarning" | "setup";
 
+// Forces the privacy and performance/heat warnings to actually be read (or
+// at least sat with) before the user can dismiss them - a full 5 full
+// seconds must elapse, counting down visibly, before "Continue" becomes
+// pressable. Re-armed independently per phase (see the useEffect keyed on
+// `phase` below), so re-entering a warning via back navigation re-forces it.
+const WARNING_HOLD_SECONDS = 5;
+
+/** Ticks a countdown from WARNING_HOLD_SECONDS down to 0 while `active`,
+ * resetting whenever `active` flips true again (e.g. a different warning
+ * phase became current). Returns null once expired - the timer text itself
+ * disappears at 0, not just the disabled state, per the design. */
+function useWarningCountdown(active: boolean): number | null {
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(active ? WARNING_HOLD_SECONDS : null);
+
+  useEffect(() => {
+    if (!active) return;
+    setSecondsLeft(WARNING_HOLD_SECONDS);
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev === null || prev <= 1) {
+          clearInterval(interval);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [active]);
+
+  return active ? secondsLeft : null;
+}
+
 export function OnboardingFlow() {
   const colors = useColors();
   const scheme = useThemeScheme();
@@ -47,6 +79,8 @@ export function OnboardingFlow() {
   const setHasOnboarded = useSettingsStore((s) => s.setHasOnboarded);
   const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
   const [gpuDevices, setGpuDevices] = useState<string[] | null>(null);
+  const warningSecondsLeft = useWarningCountdown(phase === "warning");
+  const deviceWarningSecondsLeft = useWarningCountdown(phase === "deviceWarning");
 
   useEffect(() => {
     if (phase !== "setup") return;
@@ -129,7 +163,12 @@ export function OnboardingFlow() {
             </Text>
           </View>
           <View style={styles.footerSingle}>
-            <Button label="I Understand, Continue" variant="primary" onPress={() => setPhase("deviceWarning")} />
+            <Button
+              label={warningSecondsLeft !== null ? `I Understand, Continue (${warningSecondsLeft})` : "I Understand, Continue"}
+              variant="primary"
+              disabled={warningSecondsLeft !== null}
+              onPress={() => setPhase("deviceWarning")}
+            />
           </View>
         </>
       ) : null}
@@ -142,7 +181,14 @@ export function OnboardingFlow() {
             <Text style={styles.warningEmphasis}>{PERFORMANCE_DISCLAIMER.emphasis}</Text>
           </View>
           <View style={styles.footerSingle}>
-            <Button label="I Understand, Continue" variant="primary" onPress={() => setPhase("setup")} />
+            <Button
+              label={
+                deviceWarningSecondsLeft !== null ? `I Understand, Continue (${deviceWarningSecondsLeft})` : "I Understand, Continue"
+              }
+              variant="primary"
+              disabled={deviceWarningSecondsLeft !== null}
+              onPress={() => setPhase("setup")}
+            />
           </View>
         </>
       ) : null}

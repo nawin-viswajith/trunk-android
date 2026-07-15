@@ -28,6 +28,7 @@ import { useSettingsStore } from "../state/useSettingsStore";
 import { showAlert } from "../state/useAlertStore";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../services/fileAttachment";
 import { logFailure } from "../services/sessionLog";
+import { offerCrashReport } from "../state/useCrashReportStore";
 import { setKeepAwake } from "../services/keepAwake";
 
 interface ChatMessage {
@@ -302,6 +303,12 @@ export function InferenceScreen({ route, navigation }: any) {
   // send() still re-checks right before that message.
   useEffect(() => {
     if (activeFlow || !activeProject?.modelFilename || running) return;
+    // Cleared up front, not just left stale until the load below resolves —
+    // otherwise switching to a project/model that doesn't need NPU/GPU still
+    // shows the *previous* project's unit label (e.g. "NPU") for however long
+    // this load takes, which reads as "NPU is on by default" even though the
+    // toggle is off and the new load will correctly land on CPU.
+    setInferenceUnit(null);
     let cancelled = false;
     isModelDownloaded(activeProject.modelFilename).then((downloaded) => {
       if (!downloaded || cancelled) return;
@@ -493,8 +500,11 @@ export function InferenceScreen({ route, navigation }: any) {
         totalMs: result.totalMs,
       });
     } catch (err) {
-      logFailure(activeFlow ? "Inference (via Flow)" : "Inference", err);
-      showAlert("Inference error", String(err));
+      const context = activeFlow ? "Inference (via Flow)" : "Inference";
+      logFailure(context, err);
+      // Chained onto the alert's dismiss, not fired alongside it - see the
+      // same note in ProjectDetailScreen.tsx's benchmark failure handler.
+      showAlert("Inference error", String(err), [{ label: "OK", onPress: () => offerCrashReport(context, err) }]);
     } finally {
       setRunning(false);
       setPendingExchange(null);

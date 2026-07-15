@@ -2,6 +2,7 @@ import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { AlertModalHost } from "../components/AlertModal";
 import { NetworkPromptModal } from "../components/NetworkPromptModal";
+import { CrashReportPrompt } from "../components/CrashReportPrompt";
 import { useColors } from "../theme/ThemeContext";
 import { fontFamilyForWeight } from "../theme/fonts";
 import { useSettingsStore } from "../state/useSettingsStore";
@@ -48,6 +49,7 @@ export function AppNavigator() {
       </Stack.Navigator>
       <AlertModalHost />
       <NetworkPromptModal />
+      <CrashReportPrompt />
     </>
   );
 }

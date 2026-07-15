@@ -2,6 +2,14 @@
 import { initLlama, LlamaContext, getBackendDevicesInfo } from "llama.rn";
 import { useSettingsStore } from "../state/useSettingsStore";
 import { logEvent } from "./sessionLog";
+import { quantFromFilename } from "../utils/quant";
+
+// llama.rn's OpenCL (GPU/Adreno) backend only supports these two quants today
+// (see its README's "Known Issues" section) - offloading any other quant to
+// GPU doesn't fall back gracefully, it fails to load ("failed to load model").
+// Gating on this here means the GPU toggle silently no-ops (falls back to
+// CPU) for an unsupported quant instead of the load throwing.
+const OPENCL_SUPPORTED_QUANTS = new Set(["Q4_0", "Q6_K"]);
 
 export interface EngineParams {
   contextLength: number;
@@ -155,10 +163,13 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
     const npuRequested = params.npuAcceleration ?? useSettingsStore.getState().npuAcceleration;
     const npuDevices = npuRequested ? await detectNpuDevices() : [];
     const npuActive = npuDevices.length > 0;
+    const modelQuant = quantFromFilename(modelPath.split("/").pop() ?? modelPath);
+    const gpuQuantSupported = modelQuant !== null && OPENCL_SUPPORTED_QUANTS.has(modelQuant);
     // NPU wins if both happen to be requested at once — combining them
     // (true hybrid offload) is its own future mode, not something this
     // toggle pair falls into by accident.
-    const gpuRequested = !npuActive && (params.gpuAcceleration ?? useSettingsStore.getState().gpuAcceleration);
+    const gpuRequested =
+      !npuActive && gpuQuantSupported && (params.gpuAcceleration ?? useSettingsStore.getState().gpuAcceleration);
     const gpuDevices = gpuRequested ? await detectGpuDevices() : [];
     const gpuActive = gpuDevices.length > 0;
 

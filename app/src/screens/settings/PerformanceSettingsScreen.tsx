@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Switch, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Text } from "../../components/Text";
 import { Button } from "../../components/Button";
@@ -121,6 +121,20 @@ export function PerformanceSettingsScreen() {
     );
   };
 
+  const showNpuUnsupportedInfo = () =>
+    showAlert(
+      "NPU not available on this device",
+      "This device's chipset doesn't have a supported Hexagon NPU (Qualcomm Snapdragon 8 Gen 1 or newer only), so this toggle is hidden — turning it on here would have no effect.",
+      [{ label: "OK" }]
+    );
+
+  const showGpuUnsupportedInfo = () =>
+    showAlert(
+      "GPU acceleration not available on this device",
+      "GPU offload needs a Qualcomm Adreno 700-series GPU or newer, exposed via OpenCL. Some devices (notably Samsung/Knox builds) restrict OpenCL access even when the hardware itself supports it, which would also show up as unsupported here.",
+      [{ label: "OK" }]
+    );
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Card>
@@ -168,17 +182,29 @@ export function PerformanceSettingsScreen() {
             </Text>
           </View>
         ) : null}
-        <View style={styles.toggleRow}>
-          <View style={styles.toggleTextWrap}>
-            <Text style={styles.toggleLabel}>Use NPU when available</Text>
+        {npuDevices === null || npuDevices.length > 0 ? (
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <Text style={styles.toggleLabel}>Use NPU when available</Text>
+            </View>
+            <Switch
+              value={npuAcceleration}
+              onValueChange={onToggleNpuAcceleration}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
           </View>
-          <Switch
-            value={npuAcceleration}
-            onValueChange={onToggleNpuAcceleration}
-            trackColor={{ false: colors.border, true: colors.accent }}
-            thumbColor={colors.textPrimary}
-          />
-        </View>
+        ) : (
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <Text style={styles.toggleLabel}>Use NPU when available</Text>
+              <Text style={styles.hint}>Not supported on this device.</Text>
+            </View>
+            <Pressable onPress={showNpuUnsupportedInfo} hitSlop={8} style={styles.infoButton}>
+              <Text style={styles.infoButtonText}>i</Text>
+            </Pressable>
+          </View>
+        )}
       </Card>
 
       <Card>
@@ -201,17 +227,29 @@ export function PerformanceSettingsScreen() {
             </Text>
           </View>
         ) : null}
-        <View style={styles.toggleRow}>
-          <View style={styles.toggleTextWrap}>
-            <Text style={styles.toggleLabel}>Use GPU when available</Text>
+        {gpuDevices === null || gpuDevices.length > 0 ? (
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <Text style={styles.toggleLabel}>Use GPU when available</Text>
+            </View>
+            <Switch
+              value={gpuAcceleration}
+              onValueChange={onToggleGpuAcceleration}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.textPrimary}
+            />
           </View>
-          <Switch
-            value={gpuAcceleration}
-            onValueChange={onToggleGpuAcceleration}
-            trackColor={{ false: colors.border, true: colors.accent }}
-            thumbColor={colors.textPrimary}
-          />
-        </View>
+        ) : (
+          <View style={styles.toggleRow}>
+            <View style={styles.toggleTextWrap}>
+              <Text style={styles.toggleLabel}>Use GPU when available</Text>
+              <Text style={styles.hint}>Not supported on this device.</Text>
+            </View>
+            <Pressable onPress={showGpuUnsupportedInfo} hitSlop={8} style={styles.infoButton}>
+              <Text style={styles.infoButtonText}>i</Text>
+            </Pressable>
+          </View>
+        )}
       </Card>
 
       <Card>
@@ -295,5 +333,15 @@ function createStyles(colors: ColorPalette) {
     statusValue: { fontSize: 12, fontWeight: "700" },
     statusValueGood: { color: colors.running },
     statusValueBad: { color: colors.error },
+    infoButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    infoButtonText: { color: colors.textSecondary, fontSize: 13, fontWeight: "700" },
   });
 }

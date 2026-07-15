@@ -7,6 +7,7 @@ import { ColorPalette, spacing } from "../theme/colors";
 import { createScreenStyles } from "../theme/layout";
 import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi, HfFileSummary } from "../api/huggingface";
+import { HfModelSummary } from "../api/types";
 import { checkCompatibility, CompatibilityInfo } from "../utils/compatibility";
 import { downloadModel, isModelDownloaded, getModelSource, recordModelSource } from "../services/modelStorage";
 import { canProceedWithDownload } from "../services/downloadPolicy";
@@ -48,8 +49,30 @@ function isModelsTabActive(navigation: any): boolean {
   return false;
 }
 
+const FULL_PRECISION_QUANTS = new Set(["F16", "F32", "BF16"]);
+
+/** Flags reasons this file might not be what a first-time downloader expects
+ * — surfaced as a disclaimer before the existing RAM-compatibility confirm,
+ * since "fits in RAM" says nothing about whether the file is quantized or
+ * even a text-generation model at all. */
+function buildDownloadCaveats(file: FileRow, model: HfModelSummary | undefined): string[] {
+  const caveats: string[] = [];
+  if (!file.quant) {
+    caveats.push("Couldn't determine the quantization level from the filename — verify this is actually a GGUF quant before downloading.");
+  } else if (FULL_PRECISION_QUANTS.has(file.quant)) {
+    caveats.push(`This is a full-precision (${file.quant}) file, not a quantized one — it will be far larger and slower than a Q4/Q5/Q6 variant.`);
+  }
+  if (model?.pipeline_tag && model.pipeline_tag !== "text-generation") {
+    caveats.push(`This repo is tagged "${model.pipeline_tag}", not text-generation — it may not be a chat/completion model the app can run.`);
+  } else if (!model?.pipeline_tag) {
+    caveats.push("Couldn't confirm this is a text-generation model — it may be an embedding or other non-chat model.");
+  }
+  return caveats;
+}
+
 export function HuggingFaceFilesScreen({ route, navigation }: any) {
   const repoId: string = route.params.repoId;
+  const model: HfModelSummary | undefined = route.params.model;
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [files, setFiles] = useState<FileRow[]>([]);
@@ -91,10 +114,10 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
     if (!(await canProceedWithDownload(file.filename))) return;
 
     const url = huggingfaceApi.downloadUrl(repoId, file.filename);
-    const handle = downloadModel(url, file.filename, (fraction) => {
+    const handle = downloadModel(url, file.filename, file.size_bytes, (fraction) => {
       reportDownloadProgress(file.filename, fraction);
     });
-    useDownloadStore.getState().beginDownload(file.filename, url, handle.cancel);
+    useDownloadStore.getState().beginDownload(file.filename, url, file.size_bytes, handle.cancel);
 
     handle.done
       .then(async () => {
@@ -143,6 +166,14 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
           { label: "Continue Anyway", variant: "danger", onPress: () => confirmDownloadForCompatibility(file) },
         ]
       );
+      return;
+    }
+    const caveats = buildDownloadCaveats(file, model);
+    if (caveats.length > 0) {
+      showAlert("Before you download", caveats.join("\n\n"), [
+        { label: "Cancel", variant: "neutral" },
+        { label: "Continue", onPress: () => confirmDownloadForCompatibility(file) },
+      ]);
       return;
     }
     confirmDownloadForCompatibility(file);

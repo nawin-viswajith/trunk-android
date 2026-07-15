@@ -31,14 +31,53 @@ class _FakeClient:
 
 @pytest.mark.asyncio
 async def test_search_models_maps_fields(monkeypatch):
-    fake_results = [{"id": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF", "downloads": 179753, "likes": 312}]
+    fake_results = [
+        {
+            "id": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+            "downloads": 179753,
+            "likes": 312,
+            "pipeline_tag": "text-generation",
+            "library_name": "transformers",
+            "tags": ["gguf", "text-generation", "conversational"],
+        }
+    ]
     monkeypatch.setattr(httpx, "AsyncClient", lambda timeout=10.0: _FakeClient(fake_results))
 
     results = await huggingface_service.search_models("qwen2.5-coder")
 
     assert len(results) == 1
     assert results[0].repo_id == "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF"
+    assert results[0].url == "https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF"
     assert results[0].downloads == 179753
+    assert results[0].pipeline_tag == "text-generation"
+    assert results[0].library_name == "transformers"
+    assert results[0].params == "7B"
+    assert results[0].tags == ["gguf", "text-generation", "conversational"]
+
+
+@pytest.mark.asyncio
+async def test_search_models_filters_out_embedding_models(monkeypatch):
+    fake_results = [
+        {
+            "id": "nomic-ai/nomic-embed-text-v1.5-GGUF",
+            "downloads": 86646,
+            "likes": 119,
+            "pipeline_tag": "sentence-similarity",
+            "tags": ["gguf", "feature-extraction", "sentence-similarity"],
+        },
+        {
+            "id": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+            "downloads": 179753,
+            "likes": 312,
+            "pipeline_tag": "text-generation",
+            "tags": ["gguf", "text-generation"],
+        },
+    ]
+    monkeypatch.setattr(httpx, "AsyncClient", lambda timeout=10.0: _FakeClient(fake_results))
+
+    results = await huggingface_service.search_models("qwen2.5-coder")
+
+    assert [r.repo_id for r in results] == ["Qwen/Qwen2.5-Coder-7B-Instruct-GGUF"]
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { quantFromFilename } from "../utils/quant";
+import { useDownloadStore } from "../state/useDownloadStore";
 
 export interface LocalModel {
   filename: string;
@@ -43,14 +44,21 @@ export function modelPath(filename: string): string {
 export async function listLocalModels(): Promise<LocalModel[]> {
   await ensureModelsDir();
   const filenames = await FileSystem.readDirectoryAsync(MODELS_DIR);
-  // `.part` files are always orphaned by the time this runs: useDownloadStore
-  // isn't persisted, so a real in-progress download can't survive past an
-  // app restart — any `.part` still on disk is leftover from a process kill
-  // mid-download (see downloadModel's comment) and would just sit there
-  // wasting storage forever otherwise.
+  // A `.part` file left on disk is normally orphaned - leftover from a
+  // process kill mid-download (see downloadModel's comment), since
+  // useDownloadStore isn't persisted and can't survive an app restart. But
+  // *within* one running session, a download started from one screen keeps
+  // writing to its `.part` file while the user is on another screen - e.g.
+  // Home, which reloads this list on every focus. Without excluding
+  // filenames the store still shows as downloading, that reload would
+  // delete the live `.part` file out from under the in-progress download,
+  // and its subsequent move-to-final-name would fail with "could not be
+  // moved" because the source path just vanished.
+  const activeDownloadFilenames = new Set(Object.keys(useDownloadStore.getState().downloads));
   await Promise.all(
     filenames
       .filter((f) => f.endsWith(".gguf.part"))
+      .filter((f) => !activeDownloadFilenames.has(f.replace(/\.part$/, "")))
       .map((f) => FileSystem.deleteAsync(`${MODELS_DIR}${f}`, { idempotent: true }))
   );
   const models: LocalModel[] = [];
@@ -141,7 +149,12 @@ export interface DownloadHandle {
   cancel: () => Promise<void>;
 }
 
-export function downloadModel(url: string, filename: string, onProgress: (fraction: number) => void): DownloadHandle {
+export function downloadModel(
+  url: string,
+  filename: string,
+  expectedSizeBytes: number,
+  onProgress: (fraction: number) => void
+): DownloadHandle {
   const destination = modelPath(filename);
   // Bytes land here, never at `destination` directly, until the download is
   // confirmed complete — a process kill mid-download (OS memory pressure,
@@ -161,6 +174,19 @@ export function downloadModel(url: string, filename: string, onProgress: (fracti
     .then(async (result) => {
       if (cancelled) throw new Error("cancelled");
       if (!result || result.status !== 200) throw new Error(`download failed: HTTP ${result?.status}`);
+
+      // HTTP 200 only means the response completed - it doesn't rule out a
+      // connection drop truncating the body, which downloadAsync can still
+      // resolve "successfully". Comparing against the size HF already told
+      // us catches that without needing a full checksum pass.
+      const partialInfo = await FileSystem.getInfoAsync(partialDestination);
+      const actualSize = partialInfo.exists && !partialInfo.isDirectory ? partialInfo.size : 0;
+      if (expectedSizeBytes > 0 && actualSize !== expectedSizeBytes) {
+        throw new Error(
+          `Downloaded file is ${actualSize.toLocaleString()} bytes, expected ${expectedSizeBytes.toLocaleString()} - it may be corrupt or incomplete.`
+        );
+      }
+
       await FileSystem.moveAsync({ from: partialDestination, to: destination });
     })
     .catch(async (err) => {

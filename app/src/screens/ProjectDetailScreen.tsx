@@ -16,6 +16,7 @@ import { listLocalModels, LocalModel, modelPath, isModelDownloaded, filterUsable
 import { benchmarkModel } from "../services/llamaEngine";
 import { parseInferenceParams, INFERENCE_PARAM_HINT } from "../utils/inferenceParams";
 import { logFailure } from "../services/sessionLog";
+import { offerCrashReport } from "../state/useCrashReportStore";
 
 export function ProjectDetailScreen({ route, navigation }: any) {
   const colors = useColors();
@@ -158,7 +159,12 @@ export function ProjectDetailScreen({ route, navigation }: any) {
       );
     } catch (err) {
       logFailure("Benchmark", err);
-      showAlert("Benchmark failed", `The model failed to load or generate:\n\n${String(err)}`);
+      // Chained onto the alert's own dismiss (not fired alongside it) - both
+      // are Modals, and showing them at once would have the alert's backdrop
+      // sit on top of the crash-report bar underneath it.
+      showAlert("Benchmark failed", `The model failed to load or generate:\n\n${String(err)}`, [
+        { label: "OK", onPress: () => offerCrashReport("Benchmark", err) },
+      ]);
     } finally {
       setBenchmarking(false);
     }

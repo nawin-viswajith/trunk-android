@@ -16,11 +16,15 @@ export interface DownloadEntry {
    * only see the shared store, not the original HuggingFaceFilesScreen
    * repo/file context that started it. */
   url: string;
+  /** HF's reported file size — used to verify the download wasn't truncated
+   * before it's moved into place, and carried here so a retry can redo that
+   * check without needing the original repo/file browse context either. */
+  sizeBytes: number;
 }
 
 interface DownloadStoreState {
   downloads: Record<string, DownloadEntry>;
-  beginDownload: (filename: string, url: string, cancel: () => Promise<void>) => void;
+  beginDownload: (filename: string, url: string, sizeBytes: number, cancel: () => Promise<void>) => void;
   commitProgress: (filename: string, progress: number) => void;
   setFailed: (filename: string, error: string) => void;
   clearDownload: (filename: string) => void;
@@ -28,9 +32,12 @@ interface DownloadStoreState {
 
 export const useDownloadStore = create<DownloadStoreState>((set) => ({
   downloads: {},
-  beginDownload: (filename, url, cancel) =>
+  beginDownload: (filename, url, sizeBytes, cancel) =>
     set((state) => ({
-      downloads: { ...state.downloads, [filename]: { filename, progress: 0, status: "downloading", cancel, url } },
+      downloads: {
+        ...state.downloads,
+        [filename]: { filename, progress: 0, status: "downloading", cancel, url, sizeBytes },
+      },
     })),
   commitProgress: (filename, progress) =>
     set((state) => {
@@ -95,10 +102,10 @@ export function stopTrackingDownload(filename: string): void {
 export function retryFailedDownload(filename: string): void {
   const entry = useDownloadStore.getState().downloads[filename];
   if (!entry) return;
-  const handle = downloadModel(entry.url, filename, (fraction) => {
+  const handle = downloadModel(entry.url, filename, entry.sizeBytes, (fraction) => {
     reportDownloadProgress(filename, fraction);
   });
-  useDownloadStore.getState().beginDownload(filename, entry.url, handle.cancel);
+  useDownloadStore.getState().beginDownload(filename, entry.url, entry.sizeBytes, handle.cancel);
   handle.done
     .then(() => {
       stopTrackingDownload(filename);

@@ -7,6 +7,7 @@ export interface ReleaseNote {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  { version: "1.3.6", summary: "Hugging Face search now recommends models sized for your device by default, with a disclaimer before downloading non-quantized or non-chat models. Fixed a stale NPU/GPU label on the Inference screen; the toggle is now hidden (with an info button) on devices that don't support it. Onboarding's warning screens now require a 5-second read before continuing." },
   { version: "1.3.5", summary: "Fixed a crash on launch caused by an Expo SDK version mismatch. Removed the backend URL debug display from Developer Options." },
   { version: "1.3.4", summary: "Developer Options is now always visible. Usage logging (opt-in) and Send Logs. Flow fixes: token stats, collapsed steps, session-flow persistence, keep-screen-on." },
   { version: "1.3.3", summary: "Fixed keyboard covering form fields in New Project, New Flow, and Agent Editor modals." },
