@@ -70,6 +70,14 @@ interface SettingsState {
   /** Once true, LogConsentScreen never needs to show again before "Send
    * Logs" — the user has already seen what is/isn't collected. */
   logConsentSeen: boolean;
+  /** On by default (unlike Usage Logging) - offers to auto-send a crash
+   * report (5s countdown, cancellable) whenever inference/a Flow run fails
+   * or the app crashes outright. Distinct from usageLoggingEnabled: this is
+   * about *errors*, not general usage telemetry. See CrashReportPrompt.tsx. */
+  crashReportingEnabled: boolean;
+  /** Once true, the one-time "crash reporting is now on" notice never shows
+   * again — shown once after updating to the version that introduced it. */
+  crashReportingNoticeSeen: boolean;
   setBackendUrl: (url: string) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setDarkContrast: (contrast: DarkContrast) => void;
@@ -94,6 +102,8 @@ interface SettingsState {
   setFeedbackPromptShown: (value: boolean) => void;
   setUsageLoggingEnabled: (value: boolean) => void;
   setLogConsentSeen: (value: boolean) => void;
+  setCrashReportingEnabled: (value: boolean) => void;
+  setCrashReportingNoticeSeen: (value: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -120,6 +130,8 @@ export const useSettingsStore = create<SettingsState>()(
       feedbackPromptShown: false,
       usageLoggingEnabled: false,
       logConsentSeen: false,
+      crashReportingEnabled: true,
+      crashReportingNoticeSeen: false,
       setBackendUrl: (url) => set({ backendUrl: url }),
       setThemeMode: (mode) => set({ themeMode: mode }),
       setDarkContrast: (contrast) => set({ darkContrast: contrast }),
@@ -146,6 +158,8 @@ export const useSettingsStore = create<SettingsState>()(
       setFeedbackPromptShown: (value) => set({ feedbackPromptShown: value }),
       setUsageLoggingEnabled: (value) => set({ usageLoggingEnabled: value }),
       setLogConsentSeen: (value) => set({ logConsentSeen: value }),
+      setCrashReportingEnabled: (value) => set({ crashReportingEnabled: value }),
+      setCrashReportingNoticeSeen: (value) => set({ crashReportingNoticeSeen: value }),
     }),
     {
       name: "pocketcoder-settings",

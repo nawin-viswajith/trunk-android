@@ -1,27 +1,29 @@
 import { create } from "zustand";
+import { enqueueReport, QueuedReport } from "../services/crashReportQueue";
+import { useSettingsStore } from "./useSettingsStore";
 
-export interface PendingCrashReport {
-  context: string;
-  message: string;
-}
+export type PendingCrashReport = QueuedReport;
 
 interface CrashReportState {
   pending: PendingCrashReport | null;
-  offer: (context: string, error: unknown) => void;
+  offer: (report: PendingCrashReport) => void;
   dismiss: () => void;
 }
 
 export const useCrashReportStore = create<CrashReportState>((set) => ({
   pending: null,
-  offer: (context, error) =>
-    set({ pending: { context, message: error instanceof Error ? error.message : String(error) } }),
+  offer: (report) => set({ pending: report }),
   dismiss: () => set({ pending: null }),
 }));
 
-/** Call alongside logFailure() at a model load/generate failure site to
- * surface the bottom "share this crash?" prompt - see CrashReportPrompt.tsx.
- * Kept as a plain function (mirrors showAlert in useAlertStore.ts) so call
- * sites don't need to touch the store/hook directly. */
-export function offerCrashReport(context: string, error: unknown): void {
-  useCrashReportStore.getState().offer(context, error);
+/** Call alongside logFailure() at any failure site to durably record the
+ * report (survives a crash or being offline - see crashReportQueue.ts) and,
+ * if crash reporting is enabled, surface the bottom "sending this crash
+ * report..." toast. Reporting off just leaves the record queued/pending
+ * without ever prompting - CrashReportPrompt.tsx only shows for `pending`. */
+export async function offerCrashReport(context: string, error: unknown): Promise<void> {
+  const report = await enqueueReport(context, error);
+  if (useSettingsStore.getState().crashReportingEnabled) {
+    useCrashReportStore.getState().offer(report);
+  }
 }

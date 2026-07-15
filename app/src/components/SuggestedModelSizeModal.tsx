@@ -35,7 +35,7 @@ export function SuggestedModelSizeModal({ visible, onClose, budget }: SuggestedM
                 </View>
               ))}
               <Text style={styles.note}>
-                No hard cutoff - larger models may still run but can bottleneck or crash from out-of-memory. Actual
+                No hard cutoff — larger models may still run but can bottleneck or crash from out-of-memory. Actual
                 memory use varies by model architecture, so treat these as estimates, not guarantees.
               </Text>
             </>

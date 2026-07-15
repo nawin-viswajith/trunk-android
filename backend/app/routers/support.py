@@ -43,6 +43,8 @@ def _build_issue(payload: CrashReportRequest) -> tuple[str, str]:
         f"**Total RAM:** {payload.device.total_memory_mb} MB\n"
         f"**App version:** {payload.app_version}\n"
     )
+    if payload.occurred_at:
+        body += f"**Occurred at:** {payload.occurred_at}\n"
     if payload.recent_errors:
         body += f"\n**Recent error log:**\n```\n{payload.recent_errors}\n```\n"
     body += "\n---\n_Filed automatically from the in-app crash report prompt._"

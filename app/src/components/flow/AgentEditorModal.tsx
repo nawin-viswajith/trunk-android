@@ -204,7 +204,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
                   );
                 })}
                 {models.length === 0 ? (
-                  <Text style={styles.modelEmpty}>No models downloaded yet - get one from the Models tab.</Text>
+                  <Text style={styles.modelEmpty}>No models downloaded yet — get one from the Models tab.</Text>
                 ) : null}
                 {craftError ? <Text style={styles.error}>{craftError}</Text> : null}
 

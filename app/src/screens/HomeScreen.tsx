@@ -156,7 +156,7 @@ export function HomeScreen({ navigation }: any) {
 
       <Card>
         <Text style={styles.cardTitle}>Library</Text>
-        <Text style={styles.value}>{modelCount} model{modelCount === 1 ? "" : "s"} downloaded - {formatBytes(storageUsed)}</Text>
+        <Text style={styles.value}>{modelCount} model{modelCount === 1 ? "" : "s"} downloaded — {formatBytes(storageUsed)}</Text>
         <Text style={styles.value}>{projectCount} project{projectCount === 1 ? "" : "s"}</Text>
       </Card>
 

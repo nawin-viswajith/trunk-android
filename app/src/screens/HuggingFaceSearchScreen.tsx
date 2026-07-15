@@ -202,10 +202,10 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
           loadingPopular ? null : (
             <Text style={styles.empty}>
               {recommendedResults.length > 0
-                ? "No results in this size range - try a different filter."
+                ? "No results in this size range — try a different filter."
                 : searched
                   ? `No GGUF repos found for "${query}".`
-                  : "Couldn't load recommended models - try searching instead."}
+                  : "Couldn't load recommended models — try searching instead."}
             </Text>
           )
         }

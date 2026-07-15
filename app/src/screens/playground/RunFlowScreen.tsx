@@ -14,6 +14,7 @@ import { ensureLoaded, countTokens, getActiveInferenceUnit } from "../../service
 import { modelPath } from "../../services/modelStorage";
 import { Attachment, pickTextAttachment, formatAttachmentForPrompt } from "../../services/fileAttachment";
 import { logFailure } from "../../services/sessionLog";
+import { offerCrashReport } from "../../state/useCrashReportStore";
 import { setKeepAwake } from "../../services/keepAwake";
 import { useSettingsStore } from "../../state/useSettingsStore";
 import { useProjectStore } from "../../state/useProjectStore";
@@ -137,7 +138,7 @@ export function RunFlowScreen({ route, navigation }: any) {
   const onAddToProject = () => {
     if (!flow?.modelFilename) return;
     const project = createProject(flow.name, flow.modelFilename);
-    showAlert("Project created", `"${project.name}" is ready in Projects, bound to the same model - chat there to keep history.`, [
+    showAlert("Project created", `"${project.name}" is ready in Projects, bound to the same model — chat there to keep history.`, [
       { label: "Go there", onPress: () => navigation.navigate("Projects", { screen: "Project Detail", params: { projectId: project.id } }) },
       { label: "Stay here" },
     ]);
@@ -182,6 +183,7 @@ export function RunFlowScreen({ route, navigation }: any) {
       setUsedTokenEstimate(aggregate.promptTokens + aggregate.tokens);
     } catch (err) {
       logFailure("Playground flow run", err);
+      offerCrashReport("Playground flow run", err);
       setError(String(err));
     } finally {
       setRunning(false);
@@ -218,7 +220,7 @@ export function RunFlowScreen({ route, navigation }: any) {
             <Text style={styles.emptyTitle}>Ready to run</Text>
             <Text style={styles.emptySubtitle}>Enter an input below to start the chain.</Text>
             <Text style={styles.emptyNote}>
-              This is a temporary test run for the flow - nothing here is saved. Tap "+ Project" above to keep chatting
+              This is a temporary test run for the flow — nothing here is saved. Tap "+ Project" above to keep chatting
               with this model in a real, saved conversation.
             </Text>
           </View>

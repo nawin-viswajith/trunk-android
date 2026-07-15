@@ -183,7 +183,7 @@ export function downloadModel(
       const actualSize = partialInfo.exists && !partialInfo.isDirectory ? partialInfo.size : 0;
       if (expectedSizeBytes > 0 && actualSize !== expectedSizeBytes) {
         throw new Error(
-          `Downloaded file is ${actualSize.toLocaleString()} bytes, expected ${expectedSizeBytes.toLocaleString()} - it may be corrupt or incomplete.`
+          `Downloaded file is ${actualSize.toLocaleString()} bytes, expected ${expectedSizeBytes.toLocaleString()} — it may be corrupt or incomplete.`
         );
       }
 

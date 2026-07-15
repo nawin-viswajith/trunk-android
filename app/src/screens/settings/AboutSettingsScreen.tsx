@@ -71,7 +71,7 @@ export function AboutSettingsScreen({ navigation }: any) {
           </View>
         </View>
         <Text style={styles.shortDescription}>
-          On-device by default, no cloud, no account required - chat with GGUF models, bind them to Projects, or
+          On-device by default, no cloud, no account required — chat with GGUF models, bind them to Projects, or
           chain reusable Agents into Flows.
         </Text>
         {countdownMessage ? <Text style={styles.countdown}>{countdownMessage}</Text> : null}
@@ -116,7 +116,7 @@ export function AboutSettingsScreen({ navigation }: any) {
       >
         <View style={styles.tileTextWrap}>
           <Text style={styles.licenseTileLabel}>Give Feedback</Text>
-          <Text style={styles.tileHint}>Short form - tell us what's working and what isn't</Text>
+          <Text style={styles.tileHint}>Short form — tell us what's working and what isn't</Text>
         </View>
         <Text style={styles.licenseTileCaret}>›</Text>
       </Pressable>

@@ -25,7 +25,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       signal: controller.signal,
     });
   } catch (err) {
-    if (controller.signal.aborted) throw new Error("Request timed out - the server took too long to respond.");
+    if (controller.signal.aborted) throw new Error("Request timed out — the server took too long to respond.");
     throw err;
   } finally {
     clearTimeout(timeout);

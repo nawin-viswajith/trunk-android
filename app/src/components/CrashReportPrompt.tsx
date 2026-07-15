@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Modal, Pressable, StyleSheet, View } from "react-native";
 import { Text } from "./Text";
 import { useCrashReportStore } from "../state/useCrashReportStore";
-import { sendCrashReport } from "../services/crashReport";
+import { sendQueuedReport, markReportStatus } from "../services/crashReportQueue";
 import { showAlert } from "../state/useAlertStore";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
@@ -18,7 +18,12 @@ type SendState = "idle" | "sending" | "sent";
  * "box-none" (rather than an absolutely-positioned View) so it overlays above
  * the tab bar the same reliable way AlertModalHost/NetworkPromptModal do,
  * while still letting touches outside the bar itself reach the screen below —
- * this is meant to read as a dismissible toast, not a blocking dialog. */
+ * this is meant to read as a dismissible toast, not a blocking dialog.
+ *
+ * A report already has a durable "pending" record in crashReportQueue.ts by
+ * the time this ever shows (see offerCrashReport) - this component's job is
+ * just to attempt the send and update that record's status to sent/failed/
+ * cancelled, not to be the only place the report is ever recorded. */
 export function CrashReportPrompt() {
   const pending = useCrashReportStore((s) => s.pending);
   const dismiss = useCrashReportStore((s) => s.dismiss);
@@ -53,17 +58,28 @@ export function CrashReportPrompt() {
     progress.stopAnimation();
     setSendState("sending");
     try {
-      await sendCrashReport(pending);
+      await sendQueuedReport(pending);
+      await markReportStatus(pending.id, "sent");
       setSendState("sent");
       setTimeout(dismiss, 1200);
     } catch (err) {
+      // Left as "failed", not re-queued as "pending" - retryQueuedReports()
+      // (boot + network-reconnect) picks up both statuses the same way, so
+      // this isn't lost, just not retried from this same screen instance.
+      await markReportStatus(pending.id, "failed");
       dismiss();
-      showAlert("Couldn't send report", String(err));
+      showAlert("Couldn't send report", "It'll be sent automatically once you're back online.\n\n" + String(err));
     }
   };
 
+  const cancel = async () => {
+    if (!pending) return;
+    await markReportStatus(pending.id, "cancelled");
+    dismiss();
+  };
+
   return (
-    <Modal visible={!!pending} transparent animationType="slide" onRequestClose={dismiss}>
+    <Modal visible={!!pending} transparent animationType="slide" onRequestClose={cancel}>
       <View style={styles.overlay} pointerEvents="box-none">
         {pending ? (
           <View style={styles.card}>
@@ -74,7 +90,7 @@ export function CrashReportPrompt() {
               ]}
             />
             <View style={styles.row}>
-              <Pressable onPress={dismiss} disabled={sendState === "sending"} style={styles.sideButton} hitSlop={8}>
+              <Pressable onPress={cancel} disabled={sendState === "sending"} style={styles.sideButton} hitSlop={8}>
                 <Text style={[styles.sideButtonText, { color: colors.textSecondary }]}>CANCEL</Text>
               </Pressable>
               <View style={styles.textArea}>

@@ -101,11 +101,22 @@ export function getActiveDeviceInfo(): ActiveDeviceInfo | null {
 /** Short label for whichever unit the currently-loaded context is actually
  * running on — "CPU" if nothing's loaded yet or no offload engaged, else
  * "NPU"/"GPU" derived from llama.rn's reported device list (HTP* means NPU,
- * anything else reported while gpu=true means the OpenCL/Adreno path). */
+ * anything else reported while gpu=true means the OpenCL/Adreno path).
+ *
+ * Gated on activeNpuRequested/activeGpuRequested (what Trunk actually asked
+ * ensureLoaded for), not just on info.gpu/info.devices — llama.rn's native
+ * side can report a backend device as engaged even when this app never
+ * passed a `devices` override for it (observed: NPU reported active with
+ * the Settings toggle off), presumably from the native layer's own default
+ * backend auto-selection when no explicit device list is given. Without
+ * this gate, that shows as "NPU" in the UI despite the toggle being off. */
 export function getActiveInferenceUnit(): string {
   const info = activeDeviceInfo;
   if (!info || !info.gpu || info.devices.length === 0) return "CPU";
-  return info.devices.some((d) => d.startsWith("HTP")) ? "NPU" : "GPU";
+  const isHtp = info.devices.some((d) => d.startsWith("HTP"));
+  if (isHtp && !activeNpuRequested) return "CPU";
+  if (!isHtp && !activeGpuRequested) return "CPU";
+  return isHtp ? "NPU" : "GPU";
 }
 
 export interface CompletionParams {

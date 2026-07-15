@@ -200,7 +200,7 @@ export function ColorPaletteSection() {
   return (
     <>
       <Text style={styles.hint}>
-        A coordinated three-tone palette used throughout the app - primary (buttons, selection), secondary (progress
+        A coordinated three-tone palette used throughout the app — primary (buttons, selection), secondary (progress
         and highlights, including the Inference screen), and tertiary (lighter-touch accents).
       </Text>
       <View style={styles.swatchRow}>

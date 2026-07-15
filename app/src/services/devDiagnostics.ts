@@ -89,7 +89,7 @@ export async function runDiagnostics(): Promise<DiagnosticResult[]> {
       let allOk = true;
       for (const c of cases) {
         const info = await checkCompatibility(mbToFileSizeBytes(c.requiredMb));
-        const formatOk = /^Needs ~.+ · .+ RAM available - /.test(info.message);
+        const formatOk = /^Needs ~.+ · .+ RAM available — /.test(info.message);
         const categoryOk = info.category === c.expectCategory;
         if (!formatOk || !categoryOk) allOk = false;
         lines.push(`[${c.label}] ${categoryOk ? "ok" : `expected ${c.expectCategory} got ${info.category}`} — "${info.message}"`);

@@ -100,7 +100,7 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
                 style={[styles.modelOption, modelFilename === null && styles.modelOptionActive]}
               >
                 <Text style={[styles.modelOptionLabel, modelFilename === null && styles.modelOptionLabelActive]}>
-                  None - assign later
+                  None — assign later
                 </Text>
                 <CheckIndicator checked={modelFilename === null} />
               </Pressable>
@@ -120,7 +120,7 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
                 );
               })}
               {models.length === 0 ? (
-                <Text style={styles.hint}>No models downloaded yet - you can assign one later.</Text>
+                <Text style={styles.hint}>No models downloaded yet — you can assign one later.</Text>
               ) : null}
             </View>
 

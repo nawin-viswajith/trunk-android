@@ -17,6 +17,11 @@ class CrashReportRequest(BaseModel):
     # filed issue has enough trail to actually reproduce the crash from,
     # instead of just the single error message that triggered the prompt.
     recent_errors: str | None = None
+    # ISO 8601 - when the failure actually happened, not when this request
+    # was sent. A report can be queued and retried well after the fact (app
+    # was offline, or crashed before it could send) - see
+    # app/src/services/crashReportQueue.ts.
+    occurred_at: str | None = None
 
 
 class CrashReportResponse(BaseModel):

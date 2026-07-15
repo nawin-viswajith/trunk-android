@@ -202,7 +202,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
 
   const confirmRiskyDownloadFinal = (file: FileRow) => {
     showAlert(
-      "Last chance - this is risky",
+      "Last chance — this is risky",
       "Running this model can cause:\n\n" +
         "- The app crashing or being killed by Android (out-of-memory)\n" +
         "- The whole phone slowing down or freezing temporarily\n" +

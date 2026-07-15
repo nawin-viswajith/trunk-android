@@ -230,7 +230,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
             );
           })}
           {models.length === 0 ? (
-            <Text style={styles.value}>No models downloaded yet - assign one later from the Models tab.</Text>
+            <Text style={styles.value}>No models downloaded yet — assign one later from the Models tab.</Text>
           ) : null}
         </View>
       </Card>

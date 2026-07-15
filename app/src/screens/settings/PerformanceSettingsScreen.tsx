@@ -29,6 +29,8 @@ export function PerformanceSettingsScreen() {
   const setUsageLoggingEnabled = useSettingsStore((s) => s.setUsageLoggingEnabled);
   const logConsentSeen = useSettingsStore((s) => s.logConsentSeen);
   const setLogConsentSeen = useSettingsStore((s) => s.setLogConsentSeen);
+  const crashReportingEnabled = useSettingsStore((s) => s.crashReportingEnabled);
+  const setCrashReportingEnabled = useSettingsStore((s) => s.setCrashReportingEnabled);
   const [consentVisible, setConsentVisible] = useState(false);
   // null while unknown (not yet checked this focus) — the card renders
   // nothing until resolved, rather than flashing then disappearing.
@@ -257,13 +259,31 @@ export function PerformanceSettingsScreen() {
           <View style={styles.toggleTextWrap}>
             <Text style={styles.toggleLabel}>Usage Logging</Text>
             <Text style={styles.hint}>
-              Helps understand how Trunk is used. Off by default - your prompts and responses are never included.
+              Helps understand how Trunk is used. Off by default — your prompts and responses are never included.
               See Developer Options &gt; Send Logs.
             </Text>
           </View>
           <Switch
             value={usageLoggingEnabled}
             onValueChange={onToggleUsageLogging}
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.textPrimary}
+          />
+        </View>
+      </Card>
+
+      <Card>
+        <View style={styles.toggleRow}>
+          <View style={styles.toggleTextWrap}>
+            <Text style={styles.toggleLabel}>Crash Reporting</Text>
+            <Text style={styles.hint}>
+              On by default — when inference fails or the app crashes, offers to file a report (5s to cancel) with
+              the error and recent error log, never your prompts or responses. Separate from Usage Logging above.
+            </Text>
+          </View>
+          <Switch
+            value={crashReportingEnabled}
+            onValueChange={setCrashReportingEnabled}
             trackColor={{ false: colors.border, true: colors.accent }}
             thumbColor={colors.textPrimary}
           />

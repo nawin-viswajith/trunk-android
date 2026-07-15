@@ -244,7 +244,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
       {settingsOpen ? (
         <View style={styles.settingsPanel}>
           <Text style={styles.settingsNote}>
-            Only used when this flow runs standalone (here or Run Flow) - a project's own settings win when running via
+            Only used when this flow runs standalone (here or Run Flow) — a project's own settings win when running via
             Flow from its Inference chat.
           </Text>
           <View style={styles.paramRow}>

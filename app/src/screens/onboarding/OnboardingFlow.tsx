@@ -13,7 +13,7 @@ import { detectNpuDevices, detectGpuDevices } from "../../services/llamaEngine";
 const SLIDES = [
   {
     title: "Welcome to Trunk",
-    body: "Run large language models on your own device by default - no cloud, no account required. Bring your own API key for heavier models, or turn your phone into a local inference server for other devices on your network.",
+    body: "Run large language models on your own device by default — no cloud, no account required. Bring your own API key for heavier models, or turn your phone into a local inference server for other devices on your network.",
   },
   {
     title: "Bring your own models",
@@ -77,6 +77,7 @@ export function OnboardingFlow() {
   const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
   const setGpuAcceleration = useSettingsStore((s) => s.setGpuAcceleration);
   const setHasOnboarded = useSettingsStore((s) => s.setHasOnboarded);
+  const setCrashReportingNoticeSeen = useSettingsStore((s) => s.setCrashReportingNoticeSeen);
   const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
   const [gpuDevices, setGpuDevices] = useState<string[] | null>(null);
   const warningSecondsLeft = useWarningCountdown(phase === "warning");
@@ -116,7 +117,13 @@ export function OnboardingFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheme]);
 
-  const finish = () => setHasOnboarded(true);
+  // A brand-new install never needs the "crash reporting is now on" migration
+  // notice (see App.tsx) - it's already on by default from crashReportingEnabled's
+  // own initial value, with nothing to "announce a change" relative to.
+  const finish = () => {
+    setCrashReportingNoticeSeen(true);
+    setHasOnboarded(true);
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + spacing.lg, paddingBottom: insets.bottom + spacing.lg }]}>
@@ -154,7 +161,7 @@ export function OnboardingFlow() {
           <View style={styles.body}>
             <Text style={styles.warningTitle}>⚠ Before you start</Text>
             <Text style={styles.text}>
-              Your chats and projects are stored only on this device - nothing is synced to an account or backed up
+              Your chats and projects are stored only on this device — nothing is synced to an account or backed up
               anywhere.
             </Text>
             <Text style={styles.warningEmphasis}>
@@ -197,7 +204,7 @@ export function OnboardingFlow() {
         <>
           <ScrollView style={styles.scrollBody} contentContainerStyle={styles.scrollBodyContent}>
             <Text style={styles.title}>Set up your experience</Text>
-            <Text style={styles.text}>Pick a look to start with - you can change this anytime in Settings.</Text>
+            <Text style={styles.text}>Pick a look to start with — you can change this anytime in Settings.</Text>
 
             <Text style={styles.sectionTitle}>Appearance</Text>
             <ThemeModeSection />

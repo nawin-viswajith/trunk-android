@@ -21,9 +21,16 @@ import { captureSessionVisibilityFlags } from "./src/state/sessionFlags";
 import { useDownloadStore } from "./src/state/useDownloadStore";
 import { setKeepAwake } from "./src/services/keepAwake";
 import { markSessionBoot, didPreviousSessionError, getSessionLog, formatSessionLog } from "./src/services/sessionLog";
+import { installGlobalCrashHandler } from "./src/services/globalCrashHandler";
+import { retryQueuedReports } from "./src/services/crashReportQueue";
+import * as Network from "expo-network";
 import appJson from "./app.json";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+// Installed at module load, before AppInner (or anything else) ever
+// mounts - a crash during boot itself is exactly the kind of failure this
+// exists to catch, so it can't wait for a useEffect to fire.
+installGlobalCrashHandler();
 
 const FEEDBACK_USAGE_THRESHOLD_MS = 10 * 60 * 1000;
 const USAGE_TICK_MS = 15000;
@@ -40,6 +47,7 @@ function AppInner() {
   const fontsLoaded = useAppFonts();
   const batteryPromptShown = useRef(false);
   const reportPromptShown = useRef(false);
+  const crashReportingNoticeShown = useRef(false);
   const totalUsageMs = useSettingsStore((s) => s.totalUsageMs);
   const feedbackPromptShown = useSettingsStore((s) => s.feedbackPromptShown);
   const hasAnyChatHistory = useProjectStore((s) => s.history.length > 0);
@@ -84,6 +92,20 @@ function AppInner() {
     // to reach Hugging Face search — the ~30-50s cold start then happens
     // quietly in the background while they're still on Home/onboarding.
     fetch(`${useSettingsStore.getState().backendUrl}/api/health`).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Covers two cases: a crash killed the process before its report could
+    // send (queued at boot, see globalCrashHandler.ts), and a report that
+    // failed mid-session because the connection was down at the time. Both
+    // just need a network to actually be present before retrying - no user
+    // prompt either way, since the original toast (or lack of one, for a
+    // fatal crash) already made the offer once.
+    retryQueuedReports().catch(() => {});
+    const subscription = Network.addNetworkStateListener((event) => {
+      if (event.isConnected) retryQueuedReports().catch(() => {});
+    });
+    return () => subscription.remove();
   }, []);
 
   useEffect(() => {
@@ -176,6 +198,24 @@ function AppInner() {
         ]
       );
     });
+  }, [bootDone, hasOnboarded]);
+
+  useEffect(() => {
+    // One-time, ever - announces the new (on-by-default) Crash Reporting
+    // setting to anyone updating from a version that didn't have it, so it
+    // isn't silently sending anything the user hasn't been told about.
+    // hasOnboarded guards this too since first-ever installs get the same
+    // information as part of onboarding instead (no prior version to
+    // "announce a change" relative to).
+    if (!bootDone || !hasOnboarded || crashReportingNoticeShown.current) return;
+    if (useSettingsStore.getState().crashReportingNoticeSeen) return;
+    crashReportingNoticeShown.current = true;
+    useSettingsStore.getState().setCrashReportingNoticeSeen(true);
+    showAlert(
+      "Crash reporting is now on",
+      "If inference fails or Trunk crashes, it now offers to file a report automatically (5 seconds to cancel each time) - separate from Usage Logging, which stays off. Turn it off anytime in Settings > Performance.",
+      [{ label: "Got it" }]
+    );
   }, [bootDone, hasOnboarded]);
 
   const navigationTheme = {

@@ -113,7 +113,7 @@ export async function checkCompatibility(fileSizeBytes: number): Promise<Compati
       requiredMb,
       availableMb: null,
       totalMb: null,
-      message: "Could not read device memory - proceed with caution.",
+      message: "Could not read device memory — proceed with caution.",
     };
   }
 
@@ -121,9 +121,9 @@ export async function checkCompatibility(fileSizeBytes: number): Promise<Compati
   const needed = formatMb(requiredMb);
   const available = formatMb(memory.availableMb);
   const messages: Record<Exclude<CompatibilityCategory, "unknown">, string> = {
-    supported: `Needs ~${needed} · ${available} RAM available - comfortable fit.`,
-    can_bottleneck: `Needs ~${needed} · ${available} RAM available - will likely run but expect slowdowns or other apps getting closed.`,
-    not_supported: `Needs ~${needed} · only ${available} RAM available - likely to crash from out-of-memory.`,
+    supported: `Needs ~${needed} · ${available} RAM available — comfortable fit.`,
+    can_bottleneck: `Needs ~${needed} · ${available} RAM available — will likely run but expect slowdowns or other apps getting closed.`,
+    not_supported: `Needs ~${needed} · only ${available} RAM available — likely to crash from out-of-memory.`,
   };
 
   return {
