@@ -3,7 +3,7 @@ import { Animated, StyleSheet, View } from "react-native";
 import { useFonts, Iceland_400Regular } from "@expo-google-fonts/iceland";
 import { Urbanist_300Light } from "@expo-google-fonts/urbanist";
 
-// Matches app.json's expo-splash-screen "imageWidth": 220 exactly — this
+// Matches app.json's expo-splash-screen "imageWidth": 220 exactly - this
 // screen takes over the instant the native Android splash (which renders
 // the same PNG at that width, via windowSplashScreenAnimatedIcon) hides, so
 // any size mismatch here is a visible shrink/grow jump in the logo despite
@@ -12,13 +12,13 @@ const LOGO_SIZE = 220;
 
 /** Shown immediately after the native splash hides, so the transition is
  * seamless (same black background + mark + size). The logo never moves or
- * rescales here — it was already full-size in the native splash — this
+ * rescales here - it was already full-size in the native splash - this
  * component's only job is to bring in the wordmark alongside it as one
  * settled unit, not as a second, separate reveal a beat later.
  *
  * The "Trunk" title needs the Iceland display font specifically, which is
  * NOT guaranteed loaded yet: App.tsx shows this exact component precisely
- * because the app's fonts (Iceland included) are still loading — that's
+ * because the app's fonts (Iceland included) are still loading - that's
  * its trigger condition. Waiting on the app-wide font bundle here would be
  * circular, so this loads just the one font it needs, independently and
  * far faster than the full Urbanist+Iceland set, and holds the title back

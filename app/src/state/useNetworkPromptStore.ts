@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export interface NetworkPromptResult {
   allow: boolean;
-  /** Whether "Remember my choice" was checked — downloadPolicy.ts persists
+  /** Whether "Remember my choice" was checked - downloadPolicy.ts persists
    * this into useSettingsStore so the prompt is skipped from then on. */
   remember: boolean;
 }

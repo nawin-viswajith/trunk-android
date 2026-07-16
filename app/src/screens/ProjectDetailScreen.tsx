@@ -78,7 +78,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
     navigation.setOptions({
       headerLeft: () => (
         <Pressable onPress={() => navigation.navigate(returnTo)} hitSlop={12} style={styles.backButton}>
-          <Text style={styles.backButtonLabel}>‹</Text>
+          <Text style={styles.backButtonLabel}>{`\u2039`}</Text>
         </Pressable>
       ),
     });
@@ -203,7 +203,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
               onPress={() => navigation.navigate("Inference", { projectId })}
               style={({ pressed }) => [styles.playButton, pressed && styles.playButtonPressed]}
             >
-              <Text style={styles.playButtonLabel}>{"\u25B6"} Run</Text>
+              <Text style={styles.playButtonLabel}>{"▶"} Run</Text>
             </Pressable>
           ) : null}
         </View>
@@ -288,7 +288,7 @@ export function ProjectDetailScreen({ route, navigation }: any) {
               {s.name} ({s.runs} run{s.runs === 1 ? "" : "s"})
             </Text>
             <Text style={styles.historyMeta}>
-              {s.promptTokens} tok in Â· {s.completionTokens} tok out Â· {s.avgTokPerSec.toFixed(1)} tok/s
+              {s.promptTokens} tok in · {s.completionTokens} tok out · {s.avgTokPerSec.toFixed(1)} tok/s
             </Text>
           </View>
         ))}

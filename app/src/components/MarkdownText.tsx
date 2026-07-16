@@ -1,6 +1,10 @@
-﻿import React, { useMemo } from "react";
-import { StyleSheet, TextStyle, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Pressable, StyleSheet, TextStyle, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Text } from "./Text";
+import { CopyIcon } from "./CopyIcon";
+import { MathView } from "./MathView";
+import { FlowchartView, parseFlowchart } from "./FlowchartView";
 import { spacing, ColorPalette } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
@@ -12,10 +16,11 @@ interface TextRun {
 }
 
 type Block =
-  | { type: "code"; content: string }
+  | { type: "code"; content: string; language?: string }
   | { type: "heading"; level: number; runs: TextRun[] }
   | { type: "listItem"; marker: string; runs: TextRun[] }
-  | { type: "text"; runs: TextRun[] };
+  | { type: "text"; runs: TextRun[] }
+  | { type: "math"; latex: string; displayMode: boolean };
 
 const INLINE_REGEX = /(\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_)/g;
 
@@ -36,23 +41,71 @@ function parseInline(text: string): TextRun[] {
   return runs;
 }
 
-const CODE_FENCE_REGEX = /```\w*\n?([\s\S]*?)```/g;
+const CODE_FENCE_REGEX = /```(\w*)\n?([\s\S]*?)```/g;
 const HEADING_LINE_REGEX = /^(#{1,6})\s+(.*)$/;
 const UNORDERED_LINE_REGEX = /^[-*]\s+(.*)$/;
 const ORDERED_LINE_REGEX = /^(\d+)\.\s+(.*)$/;
+// \[ ... \] (display math) and \( ... \) (inline math) - the two LaTeX
+// delimiter styles models actually emit (see the Inference screen bug this
+// was written for: raw "\[ \text{Attention}(...) \]" leaking through as
+// plain text). $$...$$ is also common enough from some models to support.
+const MATH_REGEX = /\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$\$([\s\S]+?)\$\$/g;
+
+/** Splits a text segment (already known to contain no code fences) into
+ * heading/list/plain-text and math blocks. Headings and list items each get
+ * their own block for distinct styling; consecutive plain lines are
+ * buffered and flushed as one paragraph so wrapping/justify still reads as
+ * normal running text instead of one block per line. Math is extracted from
+ * whatever's left of a paragraph line, not from heading/list lines - a model
+ * has never been observed emitting LaTeX inside a heading or list marker,
+ * and handling it there would meaningfully complicate both parsers for a
+ * case that doesn't happen. Inline math (`\( ... \)`) still renders as its
+ * own block-level MathView rather than flowing inside the surrounding
+ * prose's Text run - a WebView can't sit inline in RN text layout, so a
+ * `\(x^2\)` reference in the middle of a sentence breaks onto its own line.
+ * This is a deliberate simplification, not a bug: KaTeX itself still renders
+ * the math correctly, just not flowed with the surrounding words. */
+function parseTextWithMath(text: string): Block[] {
+  const blocks: Block[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  MATH_REGEX.lastIndex = 0;
+  while ((match = MATH_REGEX.exec(text))) {
+    if (match.index > lastIndex) {
+      const segment = text.slice(lastIndex, match.index);
+      if (segment.trim().length) blocks.push({ type: "text", runs: parseInline(segment) });
+    }
+    const displayLatex = match[1];
+    const inlineLatex = match[2];
+    const dollarLatex = match[3];
+    if (displayLatex !== undefined) {
+      blocks.push({ type: "math", latex: displayLatex.trim(), displayMode: true });
+    } else if (inlineLatex !== undefined) {
+      blocks.push({ type: "math", latex: inlineLatex.trim(), displayMode: false });
+    } else if (dollarLatex !== undefined) {
+      blocks.push({ type: "math", latex: dollarLatex.trim(), displayMode: true });
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    const segment = text.slice(lastIndex);
+    if (segment.trim().length || blocks.length === 0) blocks.push({ type: "text", runs: parseInline(segment) });
+  }
+  return blocks;
+}
 
 /** Line-level block parsing for a plain-text (non-code-fence) segment:
  * headings and list items each become their own block so they can get
- * distinct styling; consecutive plain lines are buffered and flushed as one
- * paragraph so wrapping/justify still reads as normal running text instead
- * of one block per line. */
+ * distinct styling; consecutive plain lines are buffered and flushed
+ * through parseTextWithMath so math extraction still applies to normal
+ * paragraph text. */
 function parseTextSegment(segment: string): Block[] {
   const blocks: Block[] = [];
   let paragraphLines: string[] = [];
 
   const flushParagraph = () => {
     if (paragraphLines.length === 0) return;
-    blocks.push({ type: "text", runs: parseInline(paragraphLines.join("\n")) });
+    blocks.push(...parseTextWithMath(paragraphLines.join("\n")));
     paragraphLines = [];
   };
 
@@ -91,7 +144,8 @@ function parseMarkdown(content: string): Block[] {
       const segment = content.slice(lastIndex, match.index);
       if (segment.length) blocks.push(...parseTextSegment(segment));
     }
-    blocks.push({ type: "code", content: match[1].replace(/\n$/, "") });
+    const language = match[1] || undefined;
+    blocks.push({ type: "code", content: match[2].replace(/\n$/, ""), language });
     lastIndex = match.index + match[0].length;
   }
   if (lastIndex < content.length || blocks.length === 0) {
@@ -105,9 +159,42 @@ interface MarkdownTextProps {
   textStyle: TextStyle;
 }
 
-/** Lightweight markdown for chat responses — fenced code blocks, inline
- * code, bold and italic. Not a full CommonMark parser, just what model
- * output actually uses. */
+function CodeBlock({ content, language, styles }: { content: string; language?: string; styles: ReturnType<typeof createStyles> }) {
+  const [copied, setCopied] = useState(false);
+  const colors = useColors();
+
+  if (language === "mermaid") {
+    const parsed = parseFlowchart(content);
+    if (parsed) return <FlowchartView source={content} />;
+    // Falls through to the plain code block below when the fence is tagged
+    // mermaid but doesn't parse as the supported subset - never render blank.
+  }
+
+  const onCopy = async () => {
+    await Clipboard.setStringAsync(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
+  return (
+    <View style={styles.codeBlock}>
+      <View style={styles.codeBlockHeader}>
+        <Text style={styles.codeBlockLanguage}>{language || " "}</Text>
+        <Pressable onPress={onCopy} hitSlop={10} style={styles.copyButton}>
+          <CopyIcon color={colors.textSecondary} size={14} />
+          {copied ? <Text style={styles.copiedLabel}>Copied</Text> : null}
+        </Pressable>
+      </View>
+      <Text style={styles.codeBlockText}>{content}</Text>
+    </View>
+  );
+}
+
+/** Lightweight markdown for chat responses - headings, list items, fenced
+ * code blocks (with a copy button, and mermaid-tagged fences rendered as a
+ * flowchart), LaTeX math (`\[ \]`, `\( \)`, `$$ $$`, rendered via KaTeX in
+ * MathView), inline code, bold and italic. Not a full CommonMark parser,
+ * just what model output actually uses. */
 export function MarkdownText({ content, textStyle }: MarkdownTextProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -124,11 +211,7 @@ export function MarkdownText({ content, textStyle }: MarkdownTextProps) {
     <>
       {blocks.map((block, i) => {
         if (block.type === "code") {
-          return (
-            <View key={i} style={styles.codeBlock}>
-              <Text style={styles.codeBlockText}>{block.content}</Text>
-            </View>
-          );
+          return <CodeBlock key={i} content={block.content} language={block.language} styles={styles} />;
         }
         if (block.type === "heading") {
           return (
@@ -144,6 +227,9 @@ export function MarkdownText({ content, textStyle }: MarkdownTextProps) {
               <Text style={[textStyle, styles.listItemText]}>{renderRuns(block.runs, i)}</Text>
             </View>
           );
+        }
+        if (block.type === "math") {
+          return <MathView key={i} latex={block.latex} displayMode={block.displayMode} />;
         }
         return (
           <Text key={i} style={textStyle}>
@@ -184,14 +270,30 @@ function createStyles(colors: ColorPalette) {
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      padding: spacing.sm,
       marginVertical: spacing.xs,
     },
+    codeBlockHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing.sm,
+      paddingTop: spacing.xs,
+    },
+    codeBlockLanguage: {
+      color: colors.textSecondary,
+      fontFamily: "monospace",
+      fontSize: 11,
+      textTransform: "lowercase",
+    },
+    copyButton: { flexDirection: "row", alignItems: "center", gap: spacing.xs, padding: spacing.xs },
+    copiedLabel: { color: colors.running, fontSize: 11, fontWeight: "600" },
     codeBlockText: {
       fontFamily: "monospace",
       fontSize: 13,
       lineHeight: 18,
       color: colors.textPrimary,
+      padding: spacing.sm,
+      paddingTop: spacing.xs,
     },
   });
 }

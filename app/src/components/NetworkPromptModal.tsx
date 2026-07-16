@@ -7,7 +7,7 @@ import { useNetworkPromptStore } from "../state/useNetworkPromptStore";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
-/** Mounted once at the app root (see AppNavigator.tsx) — asks before a
+/** Mounted once at the app root (see AppNavigator.tsx) - asks before a
  * download proceeds on cellular data, with a "remember my choice" checkbox
  * that lets downloadPolicy.ts skip this prompt from then on. */
 export function NetworkPromptModal() {

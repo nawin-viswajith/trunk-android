@@ -23,7 +23,7 @@ export interface Flow {
   id: string;
   name: string;
   nodes: FlowNode[];
-  /** Explicit, not derived from the graph — keeps execution unambiguous
+  /** Explicit, not derived from the graph - keeps execution unambiguous
    * even with stray/disconnected nodes left on the canvas. */
   startNodeId: string | null;
   modelFilename: string | null;
@@ -61,7 +61,7 @@ interface FlowState {
   connectNodes: (flowId: string, sourceId: string, targetId: string) => void;
   disconnectNode: (flowId: string, nodeId: string) => void;
   /** Removes exactly one directed edge (tapping a connection line on the
-   * canvas) — clears sourceId's own outgoing edge, nothing else. */
+   * canvas) - clears sourceId's own outgoing edge, nothing else. */
   removeConnection: (flowId: string, sourceId: string) => void;
 }
 
@@ -217,8 +217,8 @@ export const useFlowStore = create<FlowState>()(
         }));
       },
 
-      // Clears both directions — this node's own outgoing edge AND any
-      // other node's edge pointing into it — so it doesn't matter which
+      // Clears both directions - this node's own outgoing edge AND any
+      // other node's edge pointing into it - so it doesn't matter which
       // side of a connection the user long-presses to remove it.
       disconnectNode: (flowId, nodeId) => {
         set((state) => ({

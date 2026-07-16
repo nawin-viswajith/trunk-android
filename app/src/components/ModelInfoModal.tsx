@@ -16,10 +16,10 @@ interface ModelInfoModalProps {
   exporting?: boolean;
 }
 
-/** What we actually have for a locally-stored model — filename, quant,
+/** What we actually have for a locally-stored model - filename, quant,
  * size, when it was added, and its on-device path. There's no README/repo
  * description here because downloaded models aren't linked back to their
- * source Hugging Face repo once saved — showing one would mean faking it. */
+ * source Hugging Face repo once saved - showing one would mean faking it. */
 export function ModelInfoModal({ visible, model, onClose, onDelete, onExport, exporting }: ModelInfoModalProps) {
   const colors = useColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -47,7 +47,7 @@ export function ModelInfoModal({ visible, model, onClose, onDelete, onExport, ex
           <Text style={styles.pathLabel}>Path</Text>
           <Text style={styles.path}>{model.path}</Text>
           <Text style={styles.note}>
-            No description or README is available — downloaded models aren't linked back to their source Hugging
+            No description or README is available {"-"} downloaded models aren't linked back to their source Hugging
             Face repo once saved on-device.
           </Text>
           <Button label="Export to device" onPress={onExport} variant="secondary" loading={exporting} />

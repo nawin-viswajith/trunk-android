@@ -15,7 +15,7 @@ export function formatInferenceStats(stats: {
   const promptTokPerSec = stats.promptTokensPerSecond ?? 0;
   const tokPerSec = stats.tokensPerSecond ?? 0;
   const totalMs = stats.totalMs ?? 0;
-  return `${promptTokPerSec.toFixed(1)} tok/s in · ${tokPerSec.toFixed(1)} tok/s out · ${(totalMs / 1000).toFixed(1)}s`;
+  return `${promptTokPerSec.toFixed(1)} tok/s in \u00B7 ${tokPerSec.toFixed(1)} tok/s out \u00B7 ${(totalMs / 1000).toFixed(1)}s`;
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

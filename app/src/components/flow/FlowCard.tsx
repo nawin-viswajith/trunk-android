@@ -26,7 +26,7 @@ export function FlowCard({ flow, onPress, onLongPress, selectionMode, selected }
       <View style={styles.textWrap}>
         <Text style={styles.name}>{flow.name}</Text>
         <Text style={styles.meta}>
-          {flow.nodes.length} agent{flow.nodes.length === 1 ? "" : "s"} · {flow.modelFilename ?? "No model assigned"}
+          {flow.nodes.length} agent{flow.nodes.length === 1 ? "" : "s"} \u00B7 {flow.modelFilename ?? "No model assigned"}
         </Text>
       </View>
       {selectionMode ? <CheckIndicator checked={!!selected} /> : null}

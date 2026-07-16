@@ -6,7 +6,7 @@ import { useAlertStore } from "../state/useAlertStore";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
-/** Mounted once at the app root (see AppNavigator.tsx) — renders whatever
+/** Mounted once at the app root (see AppNavigator.tsx) - renders whatever
  * showAlert() last pushed onto useAlertStore, anywhere in the app. */
 export function AlertModalHost() {
   const current = useAlertStore((s) => s.current);

@@ -11,7 +11,7 @@ export const FONT_LIGHT = "Urbanist_300Light";
 export const FONT_REGULAR = "Urbanist_400Regular";
 export const FONT_SEMIBOLD = "Urbanist_600SemiBold";
 export const FONT_BOLD = "Urbanist_700Bold";
-/** Display face for the "Trunk" wordmark only (BootSplash) — not part of
+/** Display face for the "Trunk" wordmark only (BootSplash) - not part of
  * fontFamilyForWeight's mapping, never used for body/UI text. */
 export const FONT_DISPLAY = "Iceland_400Regular";
 

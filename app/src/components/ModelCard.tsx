@@ -14,7 +14,7 @@ interface ModelCardProps {
   onToggleSelect?: () => void;
   selectionMode?: boolean;
   selected?: boolean;
-  /** 0-1 fraction — while set, this row shows live download progress instead
+  /** 0-1 fraction - while set, this row shows live download progress instead
    * of its normal size/date metadata, and can't be opened or selected: the
    * file on disk is still partial. */
   downloadProgress?: number;
@@ -43,10 +43,10 @@ export function ModelCard({
           {model.filename}
         </Text>
         {downloading ? (
-          <Text style={styles.downloadingMeta}>Downloading… {(downloadProgress * 100).toFixed(0)}%</Text>
+          <Text style={styles.downloadingMeta}>{`Downloading\u2026 `}{(downloadProgress * 100).toFixed(0)}%</Text>
         ) : (
           <Text style={styles.meta}>
-            {[model.quant, formatBytes(model.sizeBytes), formatDate(model.addedAt)].filter(Boolean).join(" · ")}
+            {[model.quant, formatBytes(model.sizeBytes), formatDate(model.addedAt)].filter(Boolean).join(" \u00B7 ")}
           </Text>
         )}
       </View>

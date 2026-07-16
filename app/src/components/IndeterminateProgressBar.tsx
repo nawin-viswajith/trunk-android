@@ -6,7 +6,7 @@ import { useColors } from "../theme/ThemeContext";
 const SEGMENT_WIDTH = 120;
 
 /** For operations with no real progress signal (e.g. a local file copy via
- * expo-file-system, which doesn't expose byte-level progress) — an honest
+ * expo-file-system, which doesn't expose byte-level progress) - an honest
  * "work is happening" indicator instead of a fake percentage. */
 export function IndeterminateProgressBar() {
   const colors = useColors();

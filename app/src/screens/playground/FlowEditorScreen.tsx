@@ -167,7 +167,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
     <View style={styles.container}>
       <View style={[styles.topBar, { paddingTop: Math.max(spacing.sm, insets.top) }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backButton}>
-          <Text style={styles.backButtonLabel}>‹</Text>
+          <Text style={styles.backButtonLabel}>{`\u2039`}</Text>
         </Pressable>
         <View style={styles.flowNameWrap}>
           <Text style={styles.flowName} numberOfLines={1}>
@@ -182,7 +182,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
           disabled={!canRun}
           style={({ pressed }) => [styles.runButton, !canRun && styles.runButtonDisabled, pressed && canRun && styles.runButtonPressed]}
         >
-          <Text style={[styles.runButtonLabel, !canRun && styles.runButtonLabelDisabled]}>{"\u25B6"} Run</Text>
+          <Text style={[styles.runButtonLabel, !canRun && styles.runButtonLabelDisabled]}>{"▶"} Run</Text>
         </Pressable>
       </View>
 
@@ -204,7 +204,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
               ? flow.modelFilename
               : "No model assigned — tap to choose one"}
         </Text>
-        <Text style={styles.modelChipCaret}>{modelPickerOpen ? "▲" : "▼"}</Text>
+        <Text style={styles.modelChipCaret}>{modelPickerOpen ? "\u25B2" : "\u25BC"}</Text>
       </Pressable>
 
       {modelPickerOpen ? (
@@ -324,7 +324,7 @@ export function FlowEditorScreen({ route, navigation }: any) {
                       navigation.navigate("Agent Library");
                     }}
                   >
-                    <Text style={styles.agentLibraryLink}>Create one in the Agent Library ›</Text>
+                    <Text style={styles.agentLibraryLink}>{`Create one in the Agent Library \u203A`}</Text>
                   </Pressable>
                 </View>
               ) : null}

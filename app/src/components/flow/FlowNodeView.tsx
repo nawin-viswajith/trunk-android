@@ -69,7 +69,7 @@ export function FlowNodeView({
 
   const outputTap = Gesture.Tap().hitSlop(HANDLE_HIT_SLOP).onEnd(() => onTapOutputHandle());
   // A start node should never receive an incoming edge, so its input handle
-  // is inert — kept in the layout (pointerEvents="none" + faded) so node
+  // is inert - kept in the layout (pointerEvents="none" + faded) so node
   // width/connection-line anchor math doesn't shift between start/non-start.
   const inputTap = Gesture.Tap().hitSlop(HANDLE_HIT_SLOP).onEnd(() => {
     if (!isStart) onTapInputHandle();
@@ -77,7 +77,7 @@ export function FlowNodeView({
 
   return (
     <View style={[styles.wrapper, { left: node.x + dragOffset.x, top: node.y + dragOffset.y }]}>
-      {/* Card renders as a plain, fully-bounded rectangle first — handles
+      {/* Card renders as a plain, fully-bounded rectangle first - handles
        * are absolutely positioned on top, straddling its edges. Doing this
        * with flex + negative margins (the previous approach) put the
        * card's edge at a fractional pixel position on some densities,
@@ -124,7 +124,7 @@ function createStyles(colors: ColorPalette) {
       backgroundColor: colors.surface,
       paddingVertical: spacing.sm,
       // Left/right padding clears the connector dots' half-width overlap
-      // (HANDLE_SIZE / 2) plus the usual breathing room — applied to every
+      // (HANDLE_SIZE / 2) plus the usual breathing room - applied to every
       // node regardless of whether a given handle happens to be hidden, so
       // text spacing reads the same on a start/end node as on a plain one.
       paddingLeft: spacing.sm + HANDLE_SIZE / 2,

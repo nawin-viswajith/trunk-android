@@ -32,7 +32,7 @@ export function PerformanceSettingsScreen() {
   const crashReportingEnabled = useSettingsStore((s) => s.crashReportingEnabled);
   const setCrashReportingEnabled = useSettingsStore((s) => s.setCrashReportingEnabled);
   const [consentVisible, setConsentVisible] = useState(false);
-  // null while unknown (not yet checked this focus) — the card renders
+  // null while unknown (not yet checked this focus) - the card renders
   // nothing until resolved, rather than flashing then disappearing.
   const [batteryExempt, setBatteryExempt] = useState<boolean | null>(null);
   const [npuDevices, setNpuDevices] = useState<string[] | null>(null);
@@ -86,13 +86,13 @@ export function PerformanceSettingsScreen() {
     if (value && gpuAcceleration) setGpuAcceleration(false);
     if (!value) return;
     // detectNpuDevices() has already run once (see the focus effect above),
-    // so the actual per-device answer is known by the time this fires —
+    // so the actual per-device answer is known by the time this fires -
     // no reason to give the same generic "may not work" note to a device
     // that has already, concretely, been found to lack the chipset.
     if (npuDevices !== null && npuDevices.length === 0) {
       showAlert(
         "No NPU detected on this device",
-        "This device's chipset doesn't have a supported Hexagon NPU (Qualcomm Snapdragon 8 Gen 1 or newer only). Turning this on will have no effect — inference will keep running on CPU.",
+        "This device's chipset doesn't have a supported Hexagon NPU (Qualcomm Snapdragon 8 Gen 1 or newer only). Turning this on will have no effect - inference will keep running on CPU.",
         [{ label: "OK" }]
       );
       return;
@@ -111,7 +111,7 @@ export function PerformanceSettingsScreen() {
     if (gpuDevices !== null && gpuDevices.length === 0) {
       showAlert(
         "No supported GPU detected on this device",
-        "GPU offload needs a Qualcomm Adreno 700-series GPU or newer, exposed via OpenCL. Some devices (notably Samsung/Knox builds) restrict OpenCL access even when the hardware itself supports it, which would also show up as \"not detected\" here. Turning this on will have no effect — inference will keep running on CPU.",
+        "GPU offload needs a Qualcomm Adreno 700-series GPU or newer, exposed via OpenCL. Some devices (notably Samsung/Knox builds) restrict OpenCL access even when the hardware itself supports it, which would also show up as \"not detected\" here. Turning this on will have no effect - inference will keep running on CPU.",
         [{ label: "OK" }]
       );
       return;
@@ -126,7 +126,7 @@ export function PerformanceSettingsScreen() {
   const showNpuUnsupportedInfo = () =>
     showAlert(
       "NPU not available on this device",
-      "This device's chipset doesn't have a supported Hexagon NPU (Qualcomm Snapdragon 8 Gen 1 or newer only), so this toggle is hidden — turning it on here would have no effect.",
+      "This device's chipset doesn't have a supported Hexagon NPU (Qualcomm Snapdragon 8 Gen 1 or newer only), so this toggle is hidden - turning it on here would have no effect.",
       [{ label: "OK" }]
     );
 
@@ -259,7 +259,7 @@ export function PerformanceSettingsScreen() {
           <View style={styles.toggleTextWrap}>
             <Text style={styles.toggleLabel}>Usage Logging</Text>
             <Text style={styles.hint}>
-              Helps understand how Trunk is used. Off by default — your prompts and responses are never included.
+              Helps understand how Trunk is used. Off by default - your prompts and responses are never included.
               See Developer Options &gt; Send Logs.
             </Text>
           </View>
@@ -277,7 +277,7 @@ export function PerformanceSettingsScreen() {
           <View style={styles.toggleTextWrap}>
             <Text style={styles.toggleLabel}>Crash Reporting</Text>
             <Text style={styles.hint}>
-              On by default — when inference fails or the app crashes, offers to file a report (5s to cancel) with
+              On by default - when inference fails or the app crashes, offers to file a report (5s to cancel) with
               the error and recent error log, never your prompts or responses. Separate from Usage Logging above.
             </Text>
           </View>

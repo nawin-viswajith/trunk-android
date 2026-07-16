@@ -19,7 +19,7 @@ interface ButtonProps {
 }
 
 // One template for every variant: unfilled, border and text the same color,
-// centered label. Variants differ only in which color they use — no
+// centered label. Variants differ only in which color they use - no
 // per-variant fill/solid special cases, so buttons read as one consistent
 // class throughout the app rather than each screen inventing its own look.
 export function Button({ label, onPress, variant = "primary", disabled, loading, labelStyle, style }: ButtonProps) {

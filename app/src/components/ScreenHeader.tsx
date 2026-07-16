@@ -11,12 +11,12 @@ import { useColors } from "../theme/ThemeContext";
 interface ScreenHeaderProps {
   title: string;
   subtitle?: string;
-  /** Only the five root tab screens show the info/settings shortcuts —
+  /** Only the five root tab screens show the info/settings shortcuts -
    * sub-screens already have a native back button + title. */
   showActions?: boolean;
   /** Page-specific walkthrough steps. When provided, the "i" summary button
    * is replaced with a "GUIDE" text link (matching SETTINGS' style) that
-   * opens a Prev/Next/Close stepper instead — Home has no guideSteps, so it
+   * opens a Prev/Next/Close stepper instead - Home has no guideSteps, so it
    * keeps the original single-button, all-sections-at-once HelpModal. */
   guideSteps?: GuideStep[];
 }

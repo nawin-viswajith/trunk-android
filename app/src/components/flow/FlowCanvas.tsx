@@ -19,7 +19,7 @@ const STROKE = 2;
 
 /** Builds one continuous SVG path through a sequence of axis-aligned points,
  * rounding each interior corner with a quadratic curve anchored at the sharp
- * corner point — the standard way to draw a rounded-corner polyline as a
+ * corner point - the standard way to draw a rounded-corner polyline as a
  * single real path. Doing the whole connector as one <Path> sidesteps every
  * segment-joint bug a plain-View approximation ran into (border-radius
  * clamping at small box sizes, rotated-rectangle rasterization artifacts):
@@ -53,7 +53,7 @@ function roundedPolylinePath(points: Point[], radius: number): string {
  * is a "step" (right stub -> vertical -> horizontal jog at the row midpoint
  * -> vertical -> right stub): the horizontal jog always happens at the
  * vertical midpoint between the two handles, which for normally-spaced rows
- * sits in the empty gap below the source and above the target — so however
+ * sits in the empty gap below the source and above the target - so however
  * far it has to travel (including doubling back for a "backward" target
  * sitting behind the source), it never crosses either card's own text. */
 function connectionPathAndBadge(from: Point, to: Point): { d: string; badge: Point } {
@@ -63,7 +63,7 @@ function connectionPathAndBadge(from: Point, to: Point): { d: string; badge: Poi
   const vGap = Math.abs(dy);
 
   if (vGap < CORNER_RADIUS * 4) {
-    // Nodes are nearly level — no clear row gap to route the jog through,
+    // Nodes are nearly level - no clear row gap to route the jog through,
     // so a plain straight run looks better than a jog fighting for a few
     // pixels of vertical space.
     return { d: `M ${from.x} ${from.y} L ${to.x} ${to.y}`, badge: { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 } };
@@ -95,7 +95,7 @@ function RemoveBadge({ x, y, color, badgeColor, onRemove }: { x: number; y: numb
         justifyContent: "center",
       }}
     >
-      <Text style={{ color, fontSize: 13, fontWeight: "700", lineHeight: 14 }}>×</Text>
+      <Text style={{ color, fontSize: 13, fontWeight: "700", lineHeight: 14 }}>{`\u00D7`}</Text>
     </Pressable>
   );
 }
@@ -115,7 +115,7 @@ interface FlowCanvasProps {
   onViewportChange?: (info: { offset: Point; width: number; height: number }) => void;
 }
 
-/** The last node reached walking forward from the start node — used to
+/** The last node reached walking forward from the start node - used to
  * label the terminal node "END", symmetric with the "START" label. Not
  * simply "any node with no outgoing edge", since a stray/disconnected node
  * would also match that and isn't actually part of the flow's chain. */
@@ -134,10 +134,10 @@ function findEndNodeId(flow: Flow): string | null {
 }
 
 /** Pan-only (no pinch-zoom in v1) node canvas. The whole node+line layer is
- * one View translated by canvasOffset — panning the background moves that
+ * one View translated by canvasOffset - panning the background moves that
  * one View, no per-node offset math needed. Each node is its own sibling
  * GestureDetector rendered on top, so RNGH's hit-testing naturally gives it
- * priority over the background pan when a touch starts on a node — no
+ * priority over the background pan when a touch starts on a node - no
  * explicit Race/Exclusive composition needed between node-drag and
  * background-pan. */
 export function FlowCanvas({
@@ -157,7 +157,7 @@ export function FlowCanvas({
   const viewportSize = useRef({ width: 0, height: 0 });
   const [pendingSource, setPendingSource] = useState<string | null>(null);
   // While a node is being dragged, its FlowNodeView keeps the buttery-smooth
-  // visual offset locally — this just mirrors the live absolute position so
+  // visual offset locally - this just mirrors the live absolute position so
   // connection lines can track it in real time instead of snapping into
   // place only after the drag ends.
   const [liveDrag, setLiveDrag] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -218,14 +218,14 @@ export function FlowCanvas({
         }}
       >
         <View style={[styles.canvasContent, { transform: [{ translateX: canvasOffset.x }, { translateY: canvasOffset.y }] }]}>
-          {/* Nodes render first (bottom), the connections SVG after (top) —
+          {/* Nodes render first (bottom), the connections SVG after (top) -
            * a "backward" connection (target left of source) has to tuck its
            * final approach segment under the target card to reach its
            * left-edge input handle. With nodes on top that segment was
            * silently hidden behind the opaque card; drawing lines last
            * keeps every part visible. The SVG itself doesn't intercept
            * touches, so this doesn't block node drag/tap gestures underneath
-           * — only the (separately-rendered) removal badges are tappable. */}
+           * - only the (separately-rendered) removal badges are tappable. */}
           {flow.nodes.map((node) => (
             <FlowNodeView
               key={node.id}

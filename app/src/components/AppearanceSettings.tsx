@@ -134,7 +134,7 @@ function ColorField({
             <View style={styles.sliderTrackWrap}>
               <GradientSlider value={h / 360} onChange={(v) => setHsl({ h: v * 360, s, l })} stops={hueStops} />
             </View>
-            <Text style={styles.sliderValue}>{Math.round(h)}°</Text>
+            <Text style={styles.sliderValue}>{Math.round(h)}{`\u00B0`}</Text>
           </View>
           <View style={styles.sliderRow}>
             <Text style={styles.sliderLabel}>S</Text>
@@ -222,7 +222,7 @@ export function ColorPaletteSection() {
                 <View style={[styles.ball, styles.ballOverlap, { backgroundColor: preset.primary[scheme] }]} />
                 {active ? (
                   <View style={styles.checkBadge}>
-                    <Text style={styles.checkBadgeLabel}>✓</Text>
+                    <Text style={styles.checkBadgeLabel}>{`\u2713`}</Text>
                   </View>
                 ) : null}
               </View>
@@ -241,7 +241,7 @@ export function ColorPaletteSection() {
                 <View style={[styles.ball, styles.ballOverlap, { backgroundColor: customPrimaryColor }]} />
                 {secretTheme === "none" ? (
                   <View style={styles.checkBadge}>
-                    <Text style={styles.checkBadgeLabel}>✓</Text>
+                    <Text style={styles.checkBadgeLabel}>{`\u2713`}</Text>
                   </View>
                 ) : null}
               </>

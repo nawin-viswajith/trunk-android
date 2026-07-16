@@ -76,7 +76,7 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
   // silently overwrite the user's search results with the popular list.
   const requestIdRef = useRef(0);
 
-  // No hardcoded starter list — pull real trending GGUF repos (sorted by
+  // No hardcoded starter list - pull real trending GGUF repos (sorted by
   // downloads, no search term) from the same endpoint a search hits, then
   // narrow to what this device can actually run so a first-time user's first
   // download isn't already doomed to OOM.
@@ -179,7 +179,7 @@ export function HuggingFaceSearchScreen({ navigation }: any) {
           >
             <Text style={styles.repoId}>{item.repo_id}</Text>
             <Text style={styles.meta}>
-              {item.downloads.toLocaleString()} downloads · {item.likes.toLocaleString()} likes
+              {item.downloads.toLocaleString()} downloads \u00B7 {item.likes.toLocaleString()} likes
             </Text>
             {item.params || item.pipeline_tag ? (
               <View style={styles.badgeRow}>

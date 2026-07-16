@@ -5,7 +5,7 @@ export type DownloadStatus = "downloading" | "failed";
 
 export interface DownloadEntry {
   filename: string;
-  /** Last-committed 0-1 fraction — see reportDownloadProgress for why this
+  /** Last-committed 0-1 fraction - see reportDownloadProgress for why this
    * lags the true native progress by up to 5s. */
   progress: number;
   status: DownloadStatus;
@@ -62,7 +62,7 @@ export const useDownloadStore = create<DownloadStoreState>((set) => ({
 const latestRawProgress = new Map<string, number>();
 const flushTimers = new Map<string, ReturnType<typeof setInterval>>();
 
-/** Raw native progress ticks land here — a fast download can tick far more
+/** Raw native progress ticks land here - a fast download can tick far more
  * often than the UI needs to repaint, so this commits to the store (and
  * thus re-renders every screen watching downloads) at most every 5s. The
  * very first tick commits immediately so the UI doesn't sit blank. */
@@ -80,7 +80,7 @@ export function reportDownloadProgress(filename: string, fraction: number): void
   }
 }
 
-/** Forces the latest known raw progress to commit immediately — wired to
+/** Forces the latest known raw progress to commit immediately - wired to
  * manual pull-to-refresh so it never feels stuck on a stale percentage. */
 export function flushDownloadProgress(filename: string): void {
   const latest = latestRawProgress.get(filename);

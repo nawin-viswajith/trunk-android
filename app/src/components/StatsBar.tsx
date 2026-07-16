@@ -11,7 +11,7 @@ interface StatsBarProps {
 
 /** Bottom stats row shared by Models/Projects/Playground. The two halves
  * are independent flex columns around a fixed middle dot, so the dot sits
- * at the exact screen center regardless of either side's text length —
+ * at the exact screen center regardless of either side's text length -
  * a plain centered single string would let the dot drift whenever a count
  * changes digit-width, which reads as a small jerk. */
 export function StatsBar({ left, right }: StatsBarProps) {
@@ -22,7 +22,7 @@ export function StatsBar({ left, right }: StatsBarProps) {
       <Text style={styles.side} numberOfLines={1}>
         {left}
       </Text>
-      <Text style={styles.dot}>·</Text>
+      <Text style={styles.dot}>{"\u00B7"}</Text>
       <Text style={[styles.side, styles.sideRight]} numberOfLines={1}>
         {right}
       </Text>

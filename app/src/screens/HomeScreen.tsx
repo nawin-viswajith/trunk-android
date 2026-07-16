@@ -56,7 +56,7 @@ export function HomeScreen({ navigation }: any) {
     const chats = history.filter((h) => !h.viaFlowId);
     const flowRuns = history.filter((h) => h.viaFlowId);
     const totalTokens = history.reduce((sum, h) => sum + h.tokensGenerated, 0);
-    // Peak, not average — a flow run's zeroed stats would otherwise drag an
+    // Peak, not average - a flow run's zeroed stats would otherwise drag an
     // average down to something meaningless; peak also doubles as a rough
     // "what this device can actually do" indicator.
     const peakTokPerSec = chats.reduce((max, h) => Math.max(max, h.tokensPerSecond), 0);
@@ -76,7 +76,7 @@ export function HomeScreen({ navigation }: any) {
     return { chats: chats.length, flowRuns: flowRuns.length, totalTokens, peakTokPerSec, mostActiveProject };
   }, [history, projects]);
 
-  // Home is the app's root screen — back here should ask for a second
+  // Home is the app's root screen - back here should ask for a second
   // press within 2s before actually exiting, rather than quitting on the
   // first accidental press. Only active while Home is focused.
   const lastBackPress = useRef(0);
@@ -124,7 +124,7 @@ export function HomeScreen({ navigation }: any) {
         <Card>
           <View style={styles.cardTitleRow}>
             <Text style={styles.cardTitle}>This Device</Text>
-            <Text style={styles.detailsHint}>Details ›</Text>
+            <Text style={styles.detailsHint}>{`Details \u203A`}</Text>
           </View>
           <Text style={styles.value}>{DeviceInfo.getModel()}</Text>
           {budget ? (
@@ -140,7 +140,7 @@ export function HomeScreen({ navigation }: any) {
               ) : null}
               <Pressable onPress={() => setSuggestedModalVisible(true)}>
                 <View style={styles.suggestionBox}>
-                  <Text style={styles.suggestionLabel}>Suggested model size ›</Text>
+                  <Text style={styles.suggestionLabel}>{`Suggested model size \u203A`}</Text>
                   <Text style={styles.suggestionValue}>
                     up to ~{budget.maxParamsBillion.toFixed(1)}B parameters (Q4)
                   </Text>
@@ -166,7 +166,7 @@ export function HomeScreen({ navigation }: any) {
           <>
             <Text style={styles.value}>
               {analytics.chats} chat{analytics.chats === 1 ? "" : "s"}
-              {analytics.flowRuns > 0 ? ` · ${analytics.flowRuns} flow run${analytics.flowRuns === 1 ? "" : "s"}` : ""}
+              {analytics.flowRuns > 0 ? ` \u00B7 ${analytics.flowRuns} flow run${analytics.flowRuns === 1 ? "" : "s"}` : ""}
             </Text>
             <Text style={styles.value}>{analytics.totalTokens.toLocaleString()} tokens generated total</Text>
             {analytics.peakTokPerSec > 0 ? (

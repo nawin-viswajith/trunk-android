@@ -19,7 +19,7 @@ import { fuzzyMatch } from "../../utils/fuzzy";
 const GUIDE_STEPS: GuideStep[] = [
   {
     title: "Agents vs Flows",
-    description: "An Agent is a reusable persona — a name plus a system prompt. A Flow wires several Agents together into a linear chain.",
+    description: "An Agent is a reusable persona - a name plus a system prompt. A Flow wires several Agents together into a linear chain.",
   },
   {
     title: "Build your Agent library",
@@ -31,7 +31,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Run the chain",
-    description: "Assign a model and generation settings to the flow, then run it — watch each agent work and stream its response live, ending in one final combined result.",
+    description: "Assign a model and generation settings to the flow, then run it - watch each agent work and stream its response live, ending in one final combined result.",
   },
 ];
 
@@ -84,7 +84,7 @@ export function FlowListScreen({ navigation }: any) {
       {flows.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
-            <Text style={styles.searchIcon}>⌕</Text>
+            <Text style={styles.searchIcon}>{`\u2315`}</Text>
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -95,7 +95,7 @@ export function FlowListScreen({ navigation }: any) {
             />
             {query.length > 0 ? (
               <Pressable onPress={() => setQuery("")} hitSlop={10} style={styles.clearButton}>
-                <Text style={styles.clearButtonLabel}>×</Text>
+                <Text style={styles.clearButtonLabel}>{`\u00D7`}</Text>
               </Pressable>
             ) : null}
           </View>

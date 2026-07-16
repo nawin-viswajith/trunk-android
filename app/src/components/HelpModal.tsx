@@ -10,7 +10,7 @@ const SECTIONS = [
   { label: "Home", description: "your device's RAM and a suggested max model size." },
   { label: "Models", description: "browse and download GGUF models from Hugging Face, or import one you already have." },
   { label: "Projects", description: "bind a downloaded model to a set of generation settings (temperature, context length, etc)." },
-  { label: "Playground", description: "wire reusable Agents (saved personas) into a linear Flow, and run the chain on demand — fully on-device, sharing whichever model is currently loaded." },
+  { label: "Playground", description: "wire reusable Agents (saved personas) into a linear Flow, and run the chain on demand - fully on-device, sharing whichever model is currently loaded." },
   { label: "Inference", description: "chat with a project's model, fully on-device." },
 ];
 
@@ -26,11 +26,11 @@ export function HelpModal({ visible, onClose }: { visible: boolean; onClose: () 
             {SECTIONS.map((s) => (
               <View key={s.label} style={styles.row}>
                 <Text style={styles.label}>{s.label}</Text>
-                <Text style={styles.description}>{"• "}{s.description}</Text>
+                <Text style={styles.description}>{"\u2022 "}{s.description}</Text>
               </View>
             ))}
             <View style={styles.divider} />
-            <Text style={styles.warningTitle}>⚠ {PERFORMANCE_DISCLAIMER.title}</Text>
+            <Text style={styles.warningTitle}>{`\u26A0 `}{PERFORMANCE_DISCLAIMER.title}</Text>
             <Text style={styles.description}>{PERFORMANCE_DISCLAIMER.body}</Text>
             <Text style={styles.warningEmphasis}>{PERFORMANCE_DISCLAIMER.emphasis}</Text>
           </ScrollView>

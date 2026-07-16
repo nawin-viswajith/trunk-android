@@ -70,11 +70,11 @@ function PlaygroundStackNavigator() {
 }
 
 const ICONS: Record<string, string> = {
-  Home: "⌂",
-  Projects: "▤",
-  Models: "◧",
-  Inference: "▷",
-  Playground: "◈",
+  Home: "\u2302",
+  Projects: "\u25A4",
+  Models: "\u25E7",
+  Inference: "\u25B7",
+  Playground: "\u25C8",
 };
 
 export function RootNavigator() {
@@ -94,7 +94,7 @@ export function RootNavigator() {
         tabBarInactiveTintColor: colors.textSecondary,
         // Uses the `color` react-navigation passes in (already resolved from
         // tabBarActiveTintColor/tabBarInactiveTintColor below) instead of a
-        // hardcoded one — otherwise the icon glyph never reflects the
+        // hardcoded one - otherwise the icon glyph never reflects the
         // selected tab, only the label text underneath it does.
         tabBarIcon: ({ color }: { color: string }) => <Text style={{ fontSize: 16, color }}>{ICONS[route.name] ?? "•"}</Text>,
       })}

@@ -43,7 +43,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<ThemeContextValue>(() => {
     const scheme = themeMode === "system" ? (systemScheme === "light" ? "light" : "dark") : themeMode;
-    // A secret theme fully replaces the normal resolution below — it isn't
+    // A secret theme fully replaces the normal resolution below - it isn't
     // an accent layered on top of light/dark, it's one fixed look regardless
     // of what light/dark mode was previously selected.
     if (secretTheme !== "none") {

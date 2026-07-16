@@ -24,7 +24,7 @@ export const useAlertStore = create<AlertState>((set) => ({
   dismiss: () => set({ current: null }),
 }));
 
-/** App-styled drop-in replacement for Alert.alert() — the native dialog looks
+/** App-styled drop-in replacement for Alert.alert() - the native dialog looks
  * out of place against the rest of the flat, sharp-edged design. Rendered by
  * the single <AlertModalHost/> mounted at the app root. */
 export function showAlert(title: string, message: string, buttons?: AlertButtonConfig[]): void {

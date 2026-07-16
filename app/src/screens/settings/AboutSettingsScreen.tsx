@@ -51,7 +51,7 @@ export function AboutSettingsScreen({ navigation }: any) {
       tapCountRef.current = 0;
       unlockSecretThemes();
       setCountdownMessage(null);
-      showAlert("You found something", "Secret Themes unlocked — find them under Settings > Appearance.", [
+      showAlert("You found something", "Secret Themes unlocked - find them under Settings > Appearance.", [
         { label: "Nice" },
       ]);
     }
@@ -126,10 +126,10 @@ export function AboutSettingsScreen({ navigation }: any) {
         style={({ pressed }) => [styles.licenseTile, pressed && styles.licenseTilePressed]}
       >
         <Text style={styles.licenseTileLabel}>License</Text>
-        <Text style={styles.licenseTileCaret}>›</Text>
+        <Text style={styles.licenseTileCaret}>{`\u203A`}</Text>
       </Pressable>
 
-      {/* TODO (see ROADMAP.md): a "Developer" tile — contact/GitHub/feedback
+      {/* TODO (see ROADMAP.md): a "Developer" tile - contact/GitHub/feedback
           link for the person(s) behind Trunk. Not wired up yet, commented
           out until there's real content to show here.
       <Pressable

@@ -127,7 +127,7 @@ export function CreateProjectModal({ visible, onClose, models, onCreate }: Creat
             {modelFilename ? (
               <>
                 <Pressable onPress={() => setAdvancedOpen((v) => !v)} style={styles.advancedToggle}>
-                  <Text style={styles.advancedToggleArrow}>{advancedOpen ? "▾" : "▸"}</Text>
+                  <Text style={styles.advancedToggleArrow}>{advancedOpen ? "\u25BE" : "\u25B8"}</Text>
                   <Text style={styles.advancedToggleLabel}>Generation settings (optional)</Text>
                 </Pressable>
                 {advancedOpen ? (

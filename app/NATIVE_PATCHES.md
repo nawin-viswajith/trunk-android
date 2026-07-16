@@ -1,6 +1,6 @@
 # Native build patches
 
-`android/` is gitignored and fully disposable — `expo prebuild` (and
+`android/` is gitignored and fully disposable - `expo prebuild` (and
 especially `expo prebuild --clean`) regenerates it from scratch, wiping any
 hand-edit made directly inside it. The patches below are hand-edits, not
 Expo config, so they must be manually re-applied after any such regen. This
@@ -12,7 +12,7 @@ file is tracked in git specifically so the exact text survives even if
 Insert right before the `android {` block:
 
 ```groovy
-// Release signing comes from android/keystore.properties (gitignored — see
+// Release signing comes from android/keystore.properties (gitignored - see
 // signing/README.md for why it lives outside the generated android/ folder
 // and how to restore it after `expo prebuild --clean`). Falls back to debug
 // signing when the file is absent so a fresh checkout can still build.
@@ -73,11 +73,11 @@ Produces `app-arm64-v8a-release.apk` (ship this as "optimised"),
 ## 3. Windows 260-char path-length fix
 
 Windows' MAX_PATH limit breaks the native CMake build when source files live
-deep in `node_modules` — both the app module's own autolinked-codegen CMake
+deep in `node_modules` - both the app module's own autolinked-codegen CMake
 project and llama.rn's mirror each source file's full absolute path under
 `CMakeFiles/<target>.dir/`, pushing object file paths past 260 characters.
 
-**`android/app/build.gradle`** — insert right before the closing `}` of the
+**`android/app/build.gradle`** - insert right before the closing `}` of the
 `android { ... }` block:
 
 ```groovy
@@ -87,7 +87,7 @@ project and llama.rn's mirror each source file's full absolute path under
     // same way llama.rn's does (see the matching note in
     // android/build.gradle), and this project's deep node_modules path
     // pushes those object file paths past Windows' 260-char limit too. Must
-    // be set here (during android{} configuration, not afterEvaluate) — by
+    // be set here (during android{} configuration, not afterEvaluate) - by
     // the time afterEvaluate fires, AGP has already read and locked in the
     // default value. Must be re-added after a clean `expo prebuild`
     // regenerates this file.
@@ -100,7 +100,7 @@ project and llama.rn's mirror each source file's full absolute path under
     }
 ```
 
-**`android/build.gradle`** — insert after the `apply plugin:` lines at the
+**`android/build.gradle`** - insert after the `apply plugin:` lines at the
 top:
 
 ```groovy

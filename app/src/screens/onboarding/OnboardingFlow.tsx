@@ -159,7 +159,7 @@ export function OnboardingFlow() {
       {phase === "warning" ? (
         <>
           <View style={styles.body}>
-            <Text style={styles.warningTitle}>⚠ Before you start</Text>
+            <Text style={styles.warningTitle}>{`\u26A0 Before you start`}</Text>
             <Text style={styles.text}>
               Your chats and projects are stored only on this device — nothing is synced to an account or backed up
               anywhere.
@@ -183,7 +183,7 @@ export function OnboardingFlow() {
       {phase === "deviceWarning" ? (
         <>
           <View style={styles.body}>
-            <Text style={styles.warningTitle}>⚠ {PERFORMANCE_DISCLAIMER.title}</Text>
+            <Text style={styles.warningTitle}>{`\u26A0 `}{PERFORMANCE_DISCLAIMER.title}</Text>
             <Text style={styles.text}>{PERFORMANCE_DISCLAIMER.body}</Text>
             <Text style={styles.warningEmphasis}>{PERFORMANCE_DISCLAIMER.emphasis}</Text>
           </View>

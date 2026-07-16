@@ -24,12 +24,12 @@ export interface EngineParams {
   gpuAcceleration?: boolean;
 }
 
-/** Lite Mode's fixed low thread count — deliberately not scaled to the
+/** Lite Mode's fixed low thread count - deliberately not scaled to the
  * device's core count, since the point is a predictable low-CPU floor rather
  * than "half of whatever this phone has." */
 const LITE_MODE_THREADS = 2;
 
-// llama.cpp's own convention for "offload every layer" — used only once NPU
+// llama.cpp's own convention for "offload every layer" - used only once NPU
 // or GPU acceleration is actually enabled and detected; otherwise nGpuLayers
 // stays at its existing default of 0 (CPU-only), unchanged from before either
 // offload path existed.
@@ -41,7 +41,7 @@ let cachedGpuDevices: string[] | null = null;
 
 /** Queries llama.rn's backend device list once per process (the set of
  * available devices doesn't change while the app is running) and returns
- * just the Hexagon HTP device names, if any — see llama.rn's Hexagon/HTP
+ * just the Hexagon HTP device names, if any - see llama.rn's Hexagon/HTP
  * section: Qualcomm SM8450+ (Snapdragon 8 Gen 1+) devices only, experimental. */
 export async function detectNpuDevices(): Promise<string[]> {
   if (cachedNpuDevices) return cachedNpuDevices;
@@ -59,7 +59,7 @@ export async function detectNpuDevices(): Promise<string[]> {
 }
 
 /** Same idea as detectNpuDevices, for the OpenCL GPU backend instead of
- * Hexagon — llama.rn's OpenCL support is scoped to Qualcomm Adreno 700+
+ * Hexagon - llama.rn's OpenCL support is scoped to Qualcomm Adreno 700+
  * GPUs (see its README), and the native device list reports the real
  * driver-reported GPU name (e.g. "QUALCOMM Adreno(TM) 730"), not a fixed
  * string the way HTP devices are, so this matches on "adreno" rather than
@@ -81,7 +81,7 @@ export async function detectGpuDevices(): Promise<string[]> {
 
 export interface ActiveDeviceInfo {
   /** Whether llama.cpp actually engaged an offload device (HTP/GPU) for the
-   * currently-loaded context — can be false even with NPU acceleration
+   * currently-loaded context - can be false even with NPU acceleration
    * turned on, if this device wasn't one of the tested/supported chipsets. */
   gpu: boolean;
   devices: string[];
@@ -91,7 +91,7 @@ export interface ActiveDeviceInfo {
 
 let activeDeviceInfo: ActiveDeviceInfo | null = null;
 
-/** Runtime feedback for whichever context is currently loaded — null if
+/** Runtime feedback for whichever context is currently loaded - null if
  * nothing is loaded yet. Distinct from detectNpuDevices(), which only says
  * a device exists, not whether the active context is actually using it. */
 export function getActiveDeviceInfo(): ActiveDeviceInfo | null {
@@ -99,12 +99,12 @@ export function getActiveDeviceInfo(): ActiveDeviceInfo | null {
 }
 
 /** Short label for whichever unit the currently-loaded context is actually
- * running on — "CPU" if nothing's loaded yet or no offload engaged, else
+ * running on - "CPU" if nothing's loaded yet or no offload engaged, else
  * "NPU"/"GPU" derived from llama.rn's reported device list (HTP* means NPU,
  * anything else reported while gpu=true means the OpenCL/Adreno path).
  *
  * Gated on activeNpuRequested/activeGpuRequested (what Trunk actually asked
- * ensureLoaded for), not just on info.gpu/info.devices — llama.rn's native
+ * ensureLoaded for), not just on info.gpu/info.devices - llama.rn's native
  * side can report a backend device as engaged even when this app never
  * passed a `devices` override for it (observed: NPU reported active with
  * the Settings toggle off), presumably from the native layer's own default
@@ -126,7 +126,7 @@ export interface CompletionParams {
   topK: number;
   maxTokens: number;
   stop?: string[];
-  /** Not exposed in any parameter UI — a fixed anti-repetition floor so a
+  /** Not exposed in any parameter UI - a fixed anti-repetition floor so a
    * small/quantized model that starts echoing a phrase has something pushing
    * it off that token path, instead of looping until maxTokens is exhausted. */
   penaltyRepeat?: number;
@@ -176,7 +176,7 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
     const npuActive = npuDevices.length > 0;
     const modelQuant = quantFromFilename(modelPath.split("/").pop() ?? modelPath);
     const gpuQuantSupported = modelQuant !== null && OPENCL_SUPPORTED_QUANTS.has(modelQuant);
-    // NPU wins if both happen to be requested at once — combining them
+    // NPU wins if both happen to be requested at once - combining them
     // (true hybrid offload) is its own future mode, not something this
     // toggle pair falls into by accident.
     const gpuRequested =
@@ -185,7 +185,7 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
     const gpuActive = gpuDevices.length > 0;
 
     // Thread count, context length, and NPU/GPU offload are all fixed at
-    // load time by initLlama — toggling Lite Mode, NPU, or GPU acceleration,
+    // load time by initLlama - toggling Lite Mode, NPU, or GPU acceleration,
     // or changing a project/flow's context length, while this exact model
     // is already loaded must force a reload, or the change would silently
     // never take effect until a different model was picked.
@@ -211,7 +211,7 @@ export async function ensureLoaded(modelPath: string, params: EngineParams): Pro
       n_ctx: params.contextLength,
       n_threads: effectiveThreads,
       n_gpu_layers: params.nGpuLayers ?? (npuActive ? NPU_ALL_LAYERS : gpuActive ? GPU_ALL_LAYERS : 0),
-      // OpenCL (GPU) has no device-selection param — it's used automatically
+      // OpenCL (GPU) has no device-selection param - it's used automatically
       // once n_gpu_layers > 0 and no `devices` override is given, unlike
       // HTP which llama.rn requires naming explicitly.
       ...(npuActive ? { devices: ["HTP*"] } : {}),
@@ -248,14 +248,14 @@ export function isLoaded(modelPath: string): boolean {
   return activeModelPath === modelPath && !!activeContext;
 }
 
-/** Whichever model is currently loaded, if any — lets screens with no
+/** Whichever model is currently loaded, if any - lets screens with no
  * model of their own (e.g. the Agent Library's "craft with AI") check
  * readiness without needing to know a specific path up front. */
 export function getActiveModelPath(): string | null {
   return activeContext ? activeModelPath : null;
 }
 
-/** The n_ctx the currently-loaded context was actually opened with — lets a
+/** The n_ctx the currently-loaded context was actually opened with - lets a
  * screen compute "how full is the context window" without re-threading the
  * project/flow's configured value through separately (and staying correct
  * if ensureLoaded ever changes it, e.g. on a Lite Mode/NPU-triggered reload). */
@@ -288,7 +288,7 @@ const BENCHMARK_PROMPT = "Write one short sentence about the ocean.";
 const BENCHMARK_MAX_TOKENS = 48;
 
 /** A lightweight integrity/perf check: load the model fresh and run one small
- * fixed prompt. Throws if the model fails to load or complete — that failure
+ * fixed prompt. Throws if the model fails to load or complete - that failure
  * itself is the "integrity" signal; a clean run reports load time + tok/s. */
 export async function benchmarkModel(modelPath: string, contextLength: number): Promise<BenchmarkResult> {
   await releaseEngine();
@@ -311,7 +311,7 @@ export async function benchmarkModel(modelPath: string, contextLength: number): 
   return { loadTimeMs, tokens: result.tokens, tokensPerSecond: result.tokensPerSecond };
 }
 
-// llama.cpp's own convention for a mild-but-present anti-repetition floor —
+// llama.cpp's own convention for a mild-but-present anti-repetition floor -
 // applied whenever a caller doesn't explicitly override it, since nothing in
 // the app's parameter UI sets these today and leaving them unset disables
 // repetition penalty entirely.

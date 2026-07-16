@@ -40,7 +40,7 @@ export interface HistoryEntry {
   id: string;
   projectId: string;
   /** Absent on entries saved before multi-session chat existed; treat as
-   * "not yet migrated" — ensureDefaultSession() backfills these once. */
+   * "not yet migrated" - ensureDefaultSession() backfills these once. */
   sessionId?: string;
   prompt: string;
   response: string;
@@ -51,7 +51,7 @@ export interface HistoryEntry {
   totalMs: number;
   timestamp: number;
   /** Set when this reply came from running a Playground Flow rather than
-   * talking to the project's model directly — token stats are zeroed for
+   * talking to the project's model directly - token stats are zeroed for
    * these (runFlow doesn't expose aggregate stats), so callers computing
    * speed/token analytics should exclude them. */
   viaFlowId?: string;
@@ -99,6 +99,7 @@ interface ProjectState {
   pinSessionUnit: (sessionId: string, npuAcceleration: boolean, gpuAcceleration: boolean) => void;
   /** Remembers which Flow (or none, for Direct chat) this session uses. */
   setSessionFlow: (sessionId: string, flowId: string | undefined) => void;
+  renameSession: (sessionId: string, name: string) => void;
   /** Returns the most recently used session for a project, creating one
    * (and migrating any pre-multi-session history into it) if none exist. */
   ensureDefaultSession: (projectId: string) => ChatSession;
@@ -181,6 +182,13 @@ export const useProjectStore = create<ProjectState>()(
         }));
       },
 
+      renameSession: (sessionId, name) => {
+        const trimmed = name.trim();
+        if (!trimmed) return;
+        set((state) => ({
+          sessions: state.sessions.map((s) => (s.id === sessionId ? { ...s, name: trimmed } : s)),
+        }));
+      },
       ensureDefaultSession: (projectId) => {
         const existing = get()
           .sessions.filter((s) => s.projectId === projectId)

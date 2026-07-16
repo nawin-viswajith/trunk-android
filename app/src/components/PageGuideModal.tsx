@@ -17,7 +17,7 @@ interface PageGuideModalProps {
 }
 
 /** Per-page walkthrough: one step at a time with Prev/Next, plus an
- * explicit Close — distinct from HelpModal's single all-sections-at-once
+ * explicit Close - distinct from HelpModal's single all-sections-at-once
  * summary, which stays Home-only. */
 export function PageGuideModal({ visible, onClose, steps }: PageGuideModalProps) {
   const colors = useColors();
@@ -41,7 +41,7 @@ export function PageGuideModal({ visible, onClose, steps }: PageGuideModalProps)
               {index + 1} / {steps.length}
             </Text>
             <Pressable onPress={onClose} hitSlop={12}>
-              <Text style={styles.closeGlyph}>✕</Text>
+              <Text style={styles.closeGlyph}>{`\u2715`}</Text>
             </Pressable>
           </View>
 

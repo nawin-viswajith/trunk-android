@@ -19,7 +19,7 @@ import { fuzzyMatch } from "../utils/fuzzy";
 const GUIDE_STEPS: GuideStep[] = [
   {
     title: "What's a project",
-    description: "A project binds a downloaded model to a set of generation settings — temperature, top-p, top-k, context length, max tokens.",
+    description: "A project binds a downloaded model to a set of generation settings - temperature, top-p, top-k, context length, max tokens.",
   },
   {
     title: "Create one",
@@ -31,7 +31,7 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Manage",
-    description: "Hold a project to select it (and others) for bulk delete — this also removes its chat history.",
+    description: "Hold a project to select it (and others) for bulk delete - this also removes its chat history.",
   },
 ];
 
@@ -99,7 +99,7 @@ export function ProjectsScreen({ navigation }: any) {
       {projects.length > 0 ? (
         <View style={styles.toolbar}>
           <View style={styles.searchRow}>
-            <Text style={styles.searchIcon}>⌕</Text>
+            <Text style={styles.searchIcon}>{`\u2315`}</Text>
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -110,7 +110,7 @@ export function ProjectsScreen({ navigation }: any) {
             />
             {query.length > 0 ? (
               <Pressable onPress={() => setQuery("")} hitSlop={10} style={styles.clearButton}>
-                <Text style={styles.clearButtonLabel}>×</Text>
+                <Text style={styles.clearButtonLabel}>{`\u00D7`}</Text>
               </Pressable>
             ) : null}
           </View>

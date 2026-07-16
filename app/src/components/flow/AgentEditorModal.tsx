@@ -38,7 +38,7 @@ const AGENT_EXAMPLES: { name: string; purpose: string }[] = [
   { name: "Outline Generator", purpose: "Breaks a topic down into a structured outline" },
 ];
 
-/** "Craft with AI" always fills the systemPrompt field for review/edit —
+/** "Craft with AI" always fills the systemPrompt field for review/edit -
  * it never saves the generated text directly, so a bad draft is just as
  * editable as a hand-written one before Save is pressed. */
 export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEditorModalProps) {
@@ -99,7 +99,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
             {
               role: "system",
               content:
-                "You write effective system prompts for AI agents using the COSTAR framework: Context (the agent's role and the general kind/domain of input it will be given), Objective (the task it must accomplish), Style (how it should write — structure, level of detail), Tone (its attitude, e.g. formal, friendly, concise), Audience (who its output is for), and Response format (the expected shape/length of its replies). Structure the system prompt with those six labeled sections, each filled in briefly and concretely for the given purpose. This agent will be reused across many different runs, each with different real input arriving separately at request time — the Context section must describe the GENERAL type of input to expect (e.g. \"a block of text to summarize\"), never invent, assume, or embed a specific example of that input, since a fabricated example in the system prompt can be mistaken for the actual data and override it. Output only the system prompt text itself — no preamble, no quotes, no explanation.",
+                "You write effective system prompts for AI agents using the COSTAR framework: Context (the agent's role and the general kind/domain of input it will be given), Objective (the task it must accomplish), Style (how it should write - structure, level of detail), Tone (its attitude, e.g. formal, friendly, concise), Audience (who its output is for), and Response format (the expected shape/length of its replies). Structure the system prompt with those six labeled sections, each filled in briefly and concretely for the given purpose. This agent will be reused across many different runs, each with different real input arriving separately at request time - the Context section must describe the GENERAL type of input to expect (e.g. \"a block of text to summarize\"), never invent, assume, or embed a specific example of that input, since a fabricated example in the system prompt can be mistaken for the actual data and override it. Output only the system prompt text itself - no preamble, no quotes, no explanation.",
             },
             { role: "user", content: `Write a system prompt for an AI agent whose purpose is: ${purpose.trim()}` },
           ],
@@ -174,7 +174,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
             ) : (
               <>
                 {/* The model list and the purpose field render together,
-                 * not one gated behind the other — a cold model load is a
+                 * not one gated behind the other - a cold model load is a
                  * real 5-20s wait, and there's no reason typing the purpose
                  * has to wait for it too. Only the actual Generate call
                  * needs the model to be ready. The list stays visible even
@@ -204,7 +204,7 @@ export function AgentEditorModal({ visible, agent, onClose, onSave }: AgentEdito
                   );
                 })}
                 {models.length === 0 ? (
-                  <Text style={styles.modelEmpty}>No models downloaded yet — get one from the Models tab.</Text>
+                  <Text style={styles.modelEmpty}>No models downloaded yet - get one from the Models tab.</Text>
                 ) : null}
                 {craftError ? <Text style={styles.error}>{craftError}</Text> : null}
 

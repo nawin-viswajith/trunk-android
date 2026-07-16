@@ -17,7 +17,10 @@ import {
   selectProject,
   selectHistoryForSession,
   selectSessionsForProject,
+  ChatSession,
 } from "../state/useProjectStore";
+import { RenameSessionModal } from "../components/RenameSessionModal";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { modelPath, isModelDownloaded } from "../services/modelStorage";
 import { ensureLoaded, complete, countTokens, getActiveInferenceUnit } from "../services/llamaEngine";
 import { runFlow, FlowStepResult, aggregateFlowStats } from "../services/flowRunner";
@@ -41,9 +44,61 @@ interface ChatMessage {
 const NEW_CHAT_VALUE = "__new__";
 const NO_FLOW_VALUE = "__none__";
 // Heuristic cap on how many prior exchanges get replayed into the model's
-// context each turn — keeps prompt size bounded on long-running chats
+// context each turn - keeps prompt size bounded on long-running chats
 // without needing to reason about the project's exact context_length in tokens.
 const MAX_CONTEXT_EXCHANGES = 10;
+
+// createSession()/ensureDefaultSession() name new sessions "Chat 1", "Chat 2",
+// etc (useProjectStore.ts) - matching that exact pattern is how the
+// auto-title step decides a session is still on its untouched default name,
+// so it never overwrites a name the user picked themselves (manually renamed
+// or auto-titled once already).
+const DEFAULT_SESSION_NAME_REGEX = /^Chat \d+$/;
+const TITLE_MAX_TOKENS = 16;
+
+function isDefaultSessionName(name: string): boolean {
+  return DEFAULT_SESSION_NAME_REGEX.test(name.trim());
+}
+
+function cleanGeneratedTitle(raw: string): string {
+  // Models often wrap a short-title answer in quotes or add trailing
+  // punctuation despite instructions not to - strip both rather than
+  // re-prompting, and hard-cap length as a last resort against a model that
+  // ignores the "3-5 words" instruction entirely.
+  let title = raw.trim().split("\n")[0].trim();
+  title = title.replace(/^["'“”]+|["'“”]+$/g, "").trim();
+  title = title.replace(/[.!?]+$/g, "").trim();
+  if (title.length > 40) title = title.slice(0, 40).trim();
+  return title;
+}
+
+/** Fires one short, isolated completion (not part of the visible chat
+ * history) asking the already-loaded model to summarize the first exchange
+ * into a short title. Best-effort only: any failure (model unload, timeout,
+ * empty output) is swallowed by the caller - a session simply keeps its
+ * default "Chat N" name rather than surfacing a visible error for a
+ * cosmetic feature. */
+async function generateSessionTitle(userPrompt: string, assistantResponse: string): Promise<string | null> {
+  const result = await complete(
+    {
+      messages: [
+        {
+          role: "system",
+          content:
+            "Summarize the following exchange as a short chat title of 3 to 5 words. Respond with only the title text - no quotes, no punctuation, no preamble.",
+        },
+        { role: "user", content: `User: ${userPrompt}\n\nAssistant: ${assistantResponse}` },
+      ],
+      temperature: 0.4,
+      topP: 0.9,
+      topK: 40,
+      maxTokens: TITLE_MAX_TOKENS,
+    },
+    () => {}
+  );
+  const title = cleanGeneratedTitle(result.text);
+  return title.length > 0 ? title : null;
+}
 
 const PLACEHOLDER_TEXTS = [
   "Ask me anything...",
@@ -74,15 +129,19 @@ const GUIDE_STEPS: GuideStep[] = [
   },
   {
     title: "Chats",
-    description: "The Chat chip switches between sessions for the current project, or starts a new one — each keeps its own separate history.",
+    description: "The Chat chip switches between sessions for the current project, or starts a new one - each keeps its own separate history.",
   },
   {
     title: "Send & stream",
-    description: "Type a message and send it — the response streams token-by-token, fully on-device.",
+    description: "Type a message and send it - the response streams token-by-token, fully on-device.",
   },
   {
     title: "Stats",
     description: "Turn on inference stats in Settings to see token count and tokens/second under each reply.",
+  },
+  {
+    title: "Renaming chats",
+    description: "A chat is auto-titled from its first exchange once the reply finishes. Tap a chat's edit icon in the Chat picker to rename it yourself, or long-press it for rename/delete options.",
   },
 ];
 
@@ -99,6 +158,8 @@ export function InferenceScreen({ route, navigation }: any) {
   const ensureDefaultSession = useProjectStore((s) => s.ensureDefaultSession);
   const pinSessionUnit = useProjectStore((s) => s.pinSessionUnit);
   const setSessionFlow = useProjectStore((s) => s.setSessionFlow);
+  const renameSession = useProjectStore((s) => s.renameSession);
+  const deleteSession = useProjectStore((s) => s.deleteSession);
   const showInferenceStats = useSettingsStore((s) => s.showInferenceStats);
   const npuAcceleration = useSettingsStore((s) => s.npuAcceleration);
   const gpuAcceleration = useSettingsStore((s) => s.gpuAcceleration);
@@ -118,6 +179,8 @@ export function InferenceScreen({ route, navigation }: any) {
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false);
   const [flowPickerOpen, setFlowPickerOpen] = useState(false);
+  const [renameTarget, setRenameTarget] = useState<ChatSession | undefined>(undefined);
+  const [deleteTarget, setDeleteTarget] = useState<ChatSession | undefined>(undefined);
   const [placeholder, setPlaceholder] = useState(randomPlaceholder);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [attachError, setAttachError] = useState<string | null>(null);
@@ -195,7 +258,7 @@ export function InferenceScreen({ route, navigation }: any) {
 
   useEffect(() => {
     // Tab bar is set to hide on keyboard (tabBarHideOnKeyboard), so it no
-    // longer reserves space underneath — padding by the raw keyboard height
+    // longer reserves space underneath - padding by the raw keyboard height
     // is now correct without double-counting.
     const showEvent = Platform.OS === "android" ? "keyboardDidShow" : "keyboardWillShow";
     const hideEvent = Platform.OS === "android" ? "keyboardDidHide" : "keyboardWillHide";
@@ -218,8 +281,8 @@ export function InferenceScreen({ route, navigation }: any) {
   );
   const activeFlow = useMemo(() => flows.find((f) => f.id === activeFlowId), [flows, activeFlowId]);
   // Flows fundamentally change how a "conversation" behaves (a different
-  // agent chain instead of the model directly), so — unlike Project, which
-  // already moves you to a different session when switched — nothing should
+  // agent chain instead of the model directly), so - unlike Project, which
+  // already moves you to a different session when switched - nothing should
   // let flow-routed and direct-chat messages mix in one thread. Lock the
   // picker once the active session already has history.
   const sessionHasHistory = useMemo(
@@ -392,11 +455,35 @@ export function InferenceScreen({ route, navigation }: any) {
     }
   };
 
+  const maybeAutoTitleSession = useCallback(
+    (sessionId: string, wasFirstExchange: boolean, userPrompt: string, assistantResponse: string) => {
+      if (!wasFirstExchange) return;
+      const session = useProjectStore.getState().sessions.find((s) => s.id === sessionId);
+      if (!session || !isDefaultSessionName(session.name)) return;
+      // Fire-and-forget: runs after the visible response has already
+      // finished streaming, so it never delays the reply the user is
+      // waiting on. Any failure here (model unload mid-flight, empty/junk
+      // output) just leaves the session on its default "Chat N" name.
+      generateSessionTitle(userPrompt, assistantResponse)
+        .then((title) => {
+          if (!title) return;
+          // Re-check on the live store state (not the closed-over `session`)
+          // in case the user manually renamed it during the few seconds this
+          // completion took to run - a manual rename must always win.
+          const current = useProjectStore.getState().sessions.find((s) => s.id === sessionId);
+          if (current && isDefaultSessionName(current.name)) renameSession(sessionId, title);
+        })
+        .catch(() => {});
+    },
+    [renameSession]
+  );
+
   const send = useCallback(async () => {
     if (!prompt.trim() || !activeProject || !activeSessionId) return;
     const trimmedPrompt = prompt.trim();
     const currentAttachment = attachment;
     const sessionId = activeSessionId;
+    const wasFirstExchange = selectHistoryForSession(history, activeSessionId).length === 0;
     setPrompt("");
     setAttachment(null);
     setPendingExchange({ sessionId, prompt: trimmedPrompt, output: "" });
@@ -454,6 +541,7 @@ export function InferenceScreen({ route, navigation }: any) {
           totalMs: aggregate.totalMs,
           viaFlowId: activeFlow.id,
         });
+        maybeAutoTitleSession(activeSessionId, wasFirstExchange, trimmedPrompt, result);
         return;
       }
 
@@ -499,6 +587,7 @@ export function InferenceScreen({ route, navigation }: any) {
         promptTokensPerSecond: result.promptTokensPerSecond,
         totalMs: result.totalMs,
       });
+      maybeAutoTitleSession(activeSessionId, wasFirstExchange, trimmedPrompt, result.text);
     } catch (err) {
       const context = activeFlow ? "Inference (via Flow)" : "Inference";
       logFailure(context, err);
@@ -518,12 +607,14 @@ export function InferenceScreen({ route, navigation }: any) {
     prompt,
     attachment,
     priorTurns,
+    history,
     addHistoryEntry,
     effectiveNpuAcceleration,
     effectiveGpuAcceleration,
     npuAcceleration,
     gpuAcceleration,
     pinSessionUnit,
+    maybeAutoTitleSession,
   ]);
 
   return (
@@ -540,7 +631,7 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.switcherLabel} numberOfLines={1}>
               {activeProject?.name ?? "None"}
             </Text>
-            <Text style={styles.switcherCaret}>›</Text>
+            <Text style={styles.switcherCaret}>{`\u203A`}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -553,7 +644,7 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.switcherLabel} numberOfLines={1}>
               {activeSession?.name ?? "None"}
             </Text>
-            <Text style={styles.switcherCaret}>›</Text>
+            <Text style={styles.switcherCaret}>{`\u203A`}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -566,7 +657,7 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.switcherLabel} numberOfLines={1}>
               {activeProject?.modelFilename ?? "None"}
             </Text>
-            <Text style={styles.switcherCaret}>›</Text>
+            <Text style={styles.switcherCaret}>{`\u203A`}</Text>
           </View>
         </Pressable>
         <Pressable
@@ -589,7 +680,7 @@ export function InferenceScreen({ route, navigation }: any) {
             <Text style={styles.switcherLabel} numberOfLines={1}>
               {activeFlow?.name ?? "Direct chat"}
             </Text>
-            <Text style={styles.switcherCaret}>›</Text>
+            <Text style={styles.switcherCaret}>{`\u203A`}</Text>
           </View>
         </Pressable>
       </View>
@@ -608,7 +699,10 @@ export function InferenceScreen({ route, navigation }: any) {
       <PickerModal
         visible={sessionPickerOpen}
         title="Chat sessions"
-        options={[{ label: "+ New Chat", value: NEW_CHAT_VALUE }, ...projectSessions.map((s) => ({ label: s.name, value: s.id }))]}
+        options={[
+          { label: "+ New Chat", value: NEW_CHAT_VALUE, editable: false },
+          ...projectSessions.map((s) => ({ label: s.name, value: s.id })),
+        ]}
         selectedValue={activeSessionId}
         onSelect={(value) => {
           if (value === NEW_CHAT_VALUE) {
@@ -620,6 +714,53 @@ export function InferenceScreen({ route, navigation }: any) {
           }
         }}
         onClose={() => setSessionPickerOpen(false)}
+        onEditOption={(value) => {
+          const session = projectSessions.find((s) => s.id === value);
+          if (session) setRenameTarget(session);
+        }}
+        onLongPressOption={(value) => {
+          const session = projectSessions.find((s) => s.id === value);
+          if (!session) return;
+          showAlert(session.name, "What would you like to do?", [
+            { label: "Cancel", variant: "neutral" },
+            { label: "Rename", onPress: () => setRenameTarget(session) },
+            { label: "Delete", variant: "danger", onPress: () => setDeleteTarget(session) },
+          ]);
+        }}
+      />
+      <RenameSessionModal
+        visible={!!renameTarget}
+        initialName={renameTarget?.name ?? ""}
+        onClose={() => setRenameTarget(undefined)}
+        onRename={(name) => {
+          if (renameTarget) renameSession(renameTarget.id, name);
+        }}
+      />
+      <ConfirmModal
+        visible={!!deleteTarget}
+        title="Delete this chat?"
+        message={`"${deleteTarget?.name}" and its message history will be permanently deleted. This can't be undone.`}
+        confirmLabel="Delete"
+        destructive
+        onCancel={() => setDeleteTarget(undefined)}
+        onConfirm={() => {
+          if (!deleteTarget) return;
+          const deletedId = deleteTarget.id;
+          deleteSession(deletedId);
+          setDeleteTarget(undefined);
+          // Deleting the active session leaves activeSessionId pointing at
+          // nothing - fall back to another existing session for this
+          // project, or ensureDefaultSession's own "Chat N" creation if that
+          // was the last one, same as switching projects does on mount.
+          if (deletedId === activeSessionId) {
+            const remaining = projectSessions.filter((s) => s.id !== deletedId);
+            if (remaining.length > 0) {
+              setActiveSessionId(remaining[0].id);
+            } else if (activeProjectId) {
+              setActiveSessionId(ensureDefaultSession(activeProjectId).id);
+            }
+          }
+        }}
       />
       <PickerModal
         visible={flowPickerOpen}
@@ -660,7 +801,7 @@ export function InferenceScreen({ route, navigation }: any) {
             <View style={styles.emptyState}>
               <Text style={styles.empty}>This project has no model assigned yet.</Text>
               <Pressable onPress={goToProjectDetail}>
-                <Text style={styles.emptyLink}>Assign a model in Project Detail ›</Text>
+                <Text style={styles.emptyLink}>{`Assign a model in Project Detail \u203A`}</Text>
               </Pressable>
             </View>
           ) : (

@@ -87,7 +87,7 @@ export async function deleteLocalModel(filename: string): Promise<void> {
 }
 
 /** Lets a downloaded model be copied out to a user-chosen folder (e.g. to
- * back it up, or hand it to another app) — Android's scoped storage means
+ * back it up, or hand it to another app) - Android's scoped storage means
  * the app's own model directory isn't visible to the user or other apps, so
  * this is the only way out. Uses the native copyAsync between the app's
  * file:// path and the chosen SAF destination rather than reading the whole
@@ -119,7 +119,7 @@ async function readModelSources(): Promise<Record<string, string>> {
 
 /** Downloaded models are identified on disk purely by filename, but many
  * GGUF repos reuse generic filenames (e.g. "model.Q4_K_M.gguf") across
- * unrelated models — without this, a different repo's file sharing that
+ * unrelated models - without this, a different repo's file sharing that
  * name would silently show as already-downloaded, or get overwritten by it.
  * This records which repo a given filename actually came from so callers can
  * detect that mismatch. Absent entry (never recorded, e.g. an import-from-
@@ -157,7 +157,7 @@ export function downloadModel(
 ): DownloadHandle {
   const destination = modelPath(filename);
   // Bytes land here, never at `destination` directly, until the download is
-  // confirmed complete — a process kill mid-download (OS memory pressure,
+  // confirmed complete - a process kill mid-download (OS memory pressure,
   // force-close, crash) then leaves at most a `.part` file, never something
   // indistinguishable from a real, loadable model at the final filename.
   const partialDestination = `${destination}.part`;
@@ -183,7 +183,7 @@ export function downloadModel(
       const actualSize = partialInfo.exists && !partialInfo.isDirectory ? partialInfo.size : 0;
       if (expectedSizeBytes > 0 && actualSize !== expectedSizeBytes) {
         throw new Error(
-          `Downloaded file is ${actualSize.toLocaleString()} bytes, expected ${expectedSizeBytes.toLocaleString()} — it may be corrupt or incomplete.`
+          `Downloaded file is ${actualSize.toLocaleString()} bytes, expected ${expectedSizeBytes.toLocaleString()} - it may be corrupt or incomplete.`
         );
       }
 

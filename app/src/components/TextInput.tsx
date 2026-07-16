@@ -4,7 +4,7 @@ import { fontFamilyForWeight } from "../theme/fonts";
 import { useSettingsStore } from "../state/useSettingsStore";
 
 /** Drop-in replacement for RN's TextInput that defaults to the app's
- * Urbanist font — see Text.tsx for why the weight has to be resolved to a
+ * Urbanist font - see Text.tsx for why the weight has to be resolved to a
  * specific pre-loaded font file and the numeric fontWeight cleared back to
  * "normal" afterward. */
 export function TextInput({ style, ...rest }: TextInputProps) {

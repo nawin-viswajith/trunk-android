@@ -1,7 +1,7 @@
 ﻿import React from "react";
 import { View } from "react-native";
 
-/** A flat, drawn trash-can mark — built from plain Views (same technique as
+/** A flat, drawn trash-can mark - built from plain Views (same technique as
  * CheckIndicator's checkmark) instead of the bin emoji, which renders as a
  * colorful pictograph on most Android devices and clashes with the flat,
  * monochrome design language. */

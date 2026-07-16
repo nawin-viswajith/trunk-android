@@ -21,7 +21,7 @@ export interface DeviceDetails {
   manufacturer: string;
   brand: string;
   model: string;
-  /** Board/chipset codename as reported by the OS — not always a friendly
+  /** Board/chipset codename as reported by the OS - not always a friendly
    * marketing name (e.g. Samsung/MediaTek boards often just report a
    * platform code, not "Snapdragon 8 Elite" or similar). */
   deviceId: string;
@@ -35,7 +35,7 @@ export interface DeviceDetails {
  * native code: model/chipset identity, OS version, supported CPU ABIs, and
  * RAM/storage totals. CPU/GPU clock speed, core count, GPU/NPU model, and
  * RAM/storage type+speed are NOT exposed by any public Android API to a
- * normal app — there is no cross-device way to read them here. */
+ * normal app - there is no cross-device way to read them here. */
 export async function getDeviceDetails(): Promise<DeviceDetails | null> {
   try {
     const brand = DeviceInfo.getBrand();

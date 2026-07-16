@@ -30,7 +30,7 @@ export function SettingsListScreen({ navigation }: any) {
             <Text style={styles.rowLabel}>{category.label}</Text>
             <Text style={styles.rowHint}>{category.hint}</Text>
           </View>
-          <Text style={styles.rowCaret}>›</Text>
+          <Text style={styles.rowCaret}>{`\u203A`}</Text>
         </Pressable>
       ))}
     </ScrollView>

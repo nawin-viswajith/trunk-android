@@ -195,7 +195,7 @@ export function RunFlowScreen({ route, navigation }: any) {
     <View style={[styles.container, { paddingBottom: keyboardHeight ? keyboardHeight + spacing.md : 0 }]}>
       <View style={[styles.topBar, { paddingTop: Math.max(spacing.sm, insets.top) }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backButton}>
-          <Text style={styles.backButtonLabel}>‹</Text>
+          <Text style={styles.backButtonLabel}>{`\u2039`}</Text>
         </Pressable>
         <Text style={styles.flowName} numberOfLines={1}>
           {flow.name}

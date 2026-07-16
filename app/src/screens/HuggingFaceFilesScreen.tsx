@@ -34,7 +34,7 @@ interface FileRow extends HfFileSummary {
 }
 
 /** Walks up to the root Tab.Navigator to check whether "Models" is the
- * currently active tab — re-checked fresh at completion time (not render
+ * currently active tab - re-checked fresh at completion time (not render
  * time), since the download can easily finish minutes after the user
  * wandered off to another tab. */
 function isModelsTabActive(navigation: any): boolean {
@@ -281,7 +281,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
             <Text style={styles.meta}>{[item.quant, formatBytes(item.size_bytes)].filter(Boolean).join(" · ")}</Text>
             {item.sourceConflict ? (
               <Text style={styles.compatMessage}>
-                A different local model already uses this filename — downloading will overwrite it.
+                A different local model already uses this filename - downloading will overwrite it.
               </Text>
             ) : !item.downloaded ? (
               <Text style={styles.compatMessage}>{item.compatibility.message}</Text>

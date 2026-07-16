@@ -45,7 +45,7 @@ export const darkBase: BasePalette = {
   warning: "#EAB308",
 };
 
-/** True OLED black — an alternate dark contrast level, not a separate theme.
+/** True OLED black - an alternate dark contrast level, not a separate theme.
  * background is pure black for max contrast/OLED power savings, but surface
  * needs a slight lift above it (not also pure black) or every header/card/
  * modal that relies on surface-vs-background contrast becomes invisible. */
@@ -129,7 +129,7 @@ export const ACCENT_PRESETS: AccentPreset[] = [
     tertiary: { dark: "#818CF8", light: "#4F46E5" },
   },
   {
-    // No color, just a contrast ramp — each tone is independently tuned per
+    // No color, just a contrast ramp - each tone is independently tuned per
     // mode (not just re-used across dark/light) so it actually reads as three
     // distinct steps against both a near-black and a white background.
     name: "Greyscale",
@@ -142,7 +142,7 @@ export const ACCENT_PRESETS: AccentPreset[] = [
 export const DEFAULT_ACCENT_PRESET = ACCENT_PRESETS[0].name;
 
 /** Hidden alternate palettes (see SettingsScreen.tsx's 7-tap easter egg on
- * the app icon) — each is a complete, self-contained ColorPalette that
+ * the app icon) - each is a complete, self-contained ColorPalette that
  * replaces the normal light/dark + accent-preset resolution entirely rather
  * than layering on top of it, so picking one looks the same regardless of
  * whatever light/dark mode was previously selected. Kept deliberately dark

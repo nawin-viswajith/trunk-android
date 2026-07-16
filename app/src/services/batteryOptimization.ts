@@ -4,7 +4,7 @@ import { showAlert } from "../state/useAlertStore";
 
 const PACKAGE_NAME = "com.tuskerlabs.trunk";
 
-/** true once Trunk is exempt from battery optimization — the Settings
+/** true once Trunk is exempt from battery optimization - the Settings
  * button and the launch-time prompt both key off this so neither shows up
  * once it's already been granted. */
 export async function isBatteryOptimizationExempt(): Promise<boolean> {
@@ -12,7 +12,7 @@ export async function isBatteryOptimizationExempt(): Promise<boolean> {
     const stillOptimized = await BatteryOptEnabled();
     return !stillOptimized;
   } catch {
-    return true; // can't determine (unsupported device/OS) — don't nag over it
+    return true; // can't determine (unsupported device/OS) - don't nag over it
   }
 }
 

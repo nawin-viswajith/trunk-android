@@ -7,6 +7,7 @@ export interface ReleaseNote {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  { version: "1.3.7a", summary: "LaTeX math rendering in chat (offline KaTeX), Mermaid-style flowchart rendering for fenced mermaid code blocks, and a copy button on every code block. Chat sessions are now auto-titled from their first exchange using the on-device model. Chats can be renamed (edit icon) or deleted (long-press for a Rename/Delete choice)." },
   { version: "1.3.6", summary: "Hugging Face search now recommends models sized for your device by default, with a disclaimer before downloading non-quantized or non-chat models. Crash Reporting (on by default, separate from Usage Logging): auto-sends a report on inference/app failures with a 5s cancel window, queues offline/fatal-crash reports for the next launch. Fixed a stale NPU/GPU label on Inference; the toggle is now hidden (with an info button) on unsupported devices. Onboarding's warning screens now require a 5-second read before continuing." },
   { version: "1.3.5", summary: "Fixed a crash on launch caused by an Expo SDK version mismatch. Removed the backend URL debug display from Developer Options." },
   { version: "1.3.4", summary: "Developer Options is now always visible. Usage logging (opt-in) and Send Logs. Flow fixes: token stats, collapsed steps, session-flow persistence, keep-screen-on." },

@@ -157,7 +157,7 @@ export function ModelsScreen({ navigation }: any) {
       <View style={styles.toolbar}>
         {models.length > 0 ? (
           <View style={styles.searchRow}>
-            <Text style={styles.searchIcon}>⌕</Text>
+            <Text style={styles.searchIcon}>{`\u2315`}</Text>
             <TextInput
               value={query}
               onChangeText={setQuery}
@@ -168,14 +168,14 @@ export function ModelsScreen({ navigation }: any) {
             />
             {query.length > 0 ? (
               <Pressable onPress={() => setQuery("")} hitSlop={10} style={styles.clearButton}>
-                <Text style={styles.clearButtonLabel}>×</Text>
+                <Text style={styles.clearButtonLabel}>{`\u00D7`}</Text>
               </Pressable>
             ) : null}
           </View>
         ) : null}
         {importing ? (
           <View style={styles.importBanner}>
-            <Text style={styles.importBannerLabel}>Importing model…</Text>
+            <Text style={styles.importBannerLabel}>{`Importing model\u2026`}</Text>
             <IndeterminateProgressBar />
           </View>
         ) : null}
@@ -184,20 +184,20 @@ export function ModelsScreen({ navigation }: any) {
             <View key={d.filename} style={styles.downloadBannerFailed}>
               <View style={styles.downloadBannerTextWrap}>
                 <Text style={styles.downloadBannerFailedLabel} numberOfLines={1}>
-                  {d.filename} — download failed
+                  {d.filename} {"-"} download failed
                 </Text>
               </View>
               <Pressable onPress={() => retryFailedDownload(d.filename)} hitSlop={10} style={styles.downloadBannerRetry}>
                 <Text style={styles.downloadBannerRetryLabel}>Retry</Text>
               </Pressable>
               <Pressable onPress={() => useDownloadStore.getState().clearDownload(d.filename)} hitSlop={10}>
-                <Text style={styles.downloadBannerDismiss}>×</Text>
+                <Text style={styles.downloadBannerDismiss}>{`\u00D7`}</Text>
               </Pressable>
             </View>
           ) : (
             <View key={d.filename} style={styles.downloadBanner}>
               <Text style={styles.downloadBannerLabel} numberOfLines={1}>
-                Downloading {d.filename} — {(d.progress * 100).toFixed(0)}%
+                Downloading {d.filename} {"-"} {(d.progress * 100).toFixed(0)}%
               </Text>
               <View style={styles.downloadBannerTrack}>
                 <View style={[styles.downloadBannerFill, { width: `${Math.min(100, d.progress * 100)}%` }]} />

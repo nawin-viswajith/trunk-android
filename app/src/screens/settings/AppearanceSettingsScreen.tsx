@@ -72,7 +72,7 @@ export function AppearanceSettingsScreen() {
             />
           </View>
           <Text style={styles.hint}>
-            Fully replaces the color system above — pick "None" to go back to normal. Turn this off to hide it again;
+            Fully replaces the color system above - pick "None" to go back to normal. Turn this off to hide it again;
             find it the same way you found it (About) to bring it back.
           </Text>
           <View style={styles.themeRow}>

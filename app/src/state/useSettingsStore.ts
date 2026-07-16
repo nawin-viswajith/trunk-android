@@ -4,7 +4,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { DEFAULT_ACCENT_PRESET, SecretThemeId } from "../theme/colors";
 
 export type ThemeMode = "light" | "dark" | "system";
-/** Two contrast levels for dark mode specifically — "standard" is the
+/** Two contrast levels for dark mode specifically - "standard" is the
  * existing dark-grey background, "pitchBlack" is true OLED black. Has no
  * effect while in light mode. */
 export type DarkContrast = "standard" | "pitchBlack";
@@ -31,7 +31,7 @@ interface SettingsState {
   hasOnboarded: boolean;
   mobileDataDownloads: MobileDataDownloadPref;
   /** Cuts the llama.cpp thread count to save battery/heat at the cost of
-   * generation speed — see LITE_MODE_THREADS in llamaEngine.ts. */
+   * generation speed - see LITE_MODE_THREADS in llamaEngine.ts. */
   liteMode: boolean;
   /** Offloads inference to the Hexagon NPU (HTP) when llama.rn detects one -
    * experimental, and only tested on Qualcomm SM8450+ (Snapdragon 8 Gen 1+).
@@ -51,7 +51,7 @@ interface SettingsState {
   keepScreenOnDuringActivity: boolean;
   /** true = Urbanist (see theme/fonts.ts), false = platform default system font. */
   useCustomFont: boolean;
-  /** Once true, the hidden theme picker stays visible in Settings forever —
+  /** Once true, the hidden theme picker stays visible in Settings forever -
    * found via 7 taps on the app icon in the About section. */
   secretThemesUnlocked: boolean;
   /** "none" = normal light/dark + accent-preset resolution; anything else
