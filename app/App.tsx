@@ -23,6 +23,7 @@ import { setKeepAwake } from "./src/services/keepAwake";
 import { markSessionBoot, didPreviousSessionError, getSessionLog, formatSessionLog } from "./src/services/sessionLog";
 import { installGlobalCrashHandler } from "./src/services/globalCrashHandler";
 import { retryQueuedReports } from "./src/services/crashReportQueue";
+import { checkForUpdate } from "./src/services/updateCheck";
 import * as Network from "expo-network";
 import appJson from "./app.json";
 
@@ -52,6 +53,8 @@ function AppInner() {
   const feedbackPromptShown = useSettingsStore((s) => s.feedbackPromptShown);
   const hasAnyChatHistory = useProjectStore((s) => s.history.length > 0);
   const feedbackPromptTriggered = useRef(false);
+  const updateCheckTriggered = useRef(false);
+  const updatePromptDismissedForVersion = useSettingsStore((s) => s.updatePromptDismissedForVersion);
   const hasActiveDownload = useDownloadStore((s) => Object.values(s.downloads).some((d) => d.status === "downloading"));
   const [initialNavState, setInitialNavState] = useState<NavigationState | undefined>(undefined);
 
@@ -85,6 +88,28 @@ function AppInner() {
       ]
     );
   }, [totalUsageMs, hasAnyChatHistory, feedbackPromptShown]);
+
+  useEffect(() => {
+    // Fire-and-forget, once per app open: hits trunk-android's public
+    // GitHub releases API (see updateCheck.ts) - there's no other update
+    // channel (expo-updates is explicitly disabled, see AndroidManifest.xml)
+    // so this is the only way the user finds out a newer version exists.
+    // A version the user already dismissed doesn't prompt again, but a
+    // still-newer release after that does.
+    if (updateCheckTriggered.current) return;
+    updateCheckTriggered.current = true;
+    checkForUpdate(appJson.expo.version).then((update) => {
+      if (!update || update.version === updatePromptDismissedForVersion) return;
+      showAlert(
+        "Update available",
+        `Trunk ${update.version} is out — you're on ${appJson.expo.version}.`,
+        [
+          { label: "Not now", variant: "neutral", onPress: () => useSettingsStore.getState().setUpdatePromptDismissedForVersion(update.version) },
+          { label: "View release", onPress: () => Linking.openURL(update.releaseUrl) },
+        ]
+      );
+    });
+  }, [updatePromptDismissedForVersion]);
 
   useEffect(() => {
     // Fire-and-forget: Render's free tier spins the backend down after idle,

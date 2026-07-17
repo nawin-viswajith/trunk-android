@@ -89,6 +89,10 @@ interface SettingsState {
    * folder at least once. Kept even if backupDownloadsEnabled is later
    * turned off, so re-enabling doesn't need the picker again. */
   backupFolderUri: string | null;
+  /** The version string of the last "update available" prompt the user
+   * dismissed with "Not now" - see updateCheck.ts. Prevents renagging about
+   * the same release every launch; a newer release than this still prompts. */
+  updatePromptDismissedForVersion: string | null;
   setBackendUrl: (url: string) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setDarkContrast: (contrast: DarkContrast) => void;
@@ -117,6 +121,7 @@ interface SettingsState {
   setCrashReportingNoticeSeen: (value: boolean) => void;
   setBackupDownloadsEnabled: (value: boolean) => void;
   setBackupFolderUri: (uri: string | null) => void;
+  setUpdatePromptDismissedForVersion: (version: string | null) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -147,6 +152,7 @@ export const useSettingsStore = create<SettingsState>()(
       crashReportingNoticeSeen: false,
       backupDownloadsEnabled: false,
       backupFolderUri: null,
+      updatePromptDismissedForVersion: null,
       setBackendUrl: (url) => set({ backendUrl: url }),
       setThemeMode: (mode) => set({ themeMode: mode }),
       setDarkContrast: (contrast) => set({ darkContrast: contrast }),
@@ -177,6 +183,7 @@ export const useSettingsStore = create<SettingsState>()(
       setCrashReportingNoticeSeen: (value) => set({ crashReportingNoticeSeen: value }),
       setBackupDownloadsEnabled: (value) => set({ backupDownloadsEnabled: value }),
       setBackupFolderUri: (uri) => set({ backupFolderUri: uri }),
+      setUpdatePromptDismissedForVersion: (version) => set({ updatePromptDismissedForVersion: version }),
     }),
     {
       name: "pocketcoder-settings",
