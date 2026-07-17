@@ -7,6 +7,7 @@ export interface ReleaseNote {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  { version: "1.3.7e", summary: "Flowchart diagrams are now centered with proper spacing around every box, and dropped the redundant \"flowchart\" label. The raw-text toggle on math and the copy button on flowcharts now sit at the right edge to match code blocks." },
   { version: "1.3.7d", summary: "Fixed math formulas with symbols like square roots, integrals, fractions, summation, and partial derivatives rendering as plain text instead of proper math notation." },
   { version: "1.3.7c", summary: "Math rendering switched from a WebView (which rendered some formulas as blank boxes on-device) to a direct-to-SVG renderer, with a Show raw/rendered toggle as a fallback. Fixed Mermaid flowcharts not rendering when a node label wrapped across multiple lines. Flowcharts now have a copy button that copies the diagram as an image." },
   { version: "1.3.7a", summary: "LaTeX math rendering in chat (offline KaTeX), Mermaid-style flowchart rendering for fenced mermaid code blocks, and a copy button on every code block. Chat sessions are now auto-titled from their first exchange using the on-device model. Chats can be renamed (edit icon) or deleted (long-press for a Rename/Delete choice)." },

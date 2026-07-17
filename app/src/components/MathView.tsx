@@ -73,7 +73,7 @@ function createStyles(colors: ColorPalette) {
     wrap: { marginVertical: 2 },
     wrapDisplay: { alignItems: "center" },
     rawText: { fontFamily: "monospace", fontSize: 13 },
-    toggle: { alignSelf: "flex-start", marginTop: 2 },
+    toggle: { alignSelf: "flex-end", marginTop: 2 },
     toggleText: { color: colors.textSecondary, fontSize: 10, textDecorationLine: "underline" },
   });
 }

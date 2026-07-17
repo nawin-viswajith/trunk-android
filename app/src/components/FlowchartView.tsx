@@ -309,39 +309,44 @@ export function FlowchartView({ source }: FlowchartViewProps) {
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
-        <Text style={styles.headerLabel}>flowchart</Text>
         <Pressable onPress={onCopy} hitSlop={10} style={styles.copyButton}>
           <CopyIcon color={colors.textSecondary} size={14} />
           {copied ? <Text style={styles.copiedLabel}>Copied</Text> : null}
         </Pressable>
       </View>
-      <ViewShot ref={shotRef} options={{ format: "png", result: "base64" }}>
-        <View style={[styles.canvas, { width: laidOut.width, height: laidOut.height }]}>
-          <Svg width={laidOut.width} height={laidOut.height} style={StyleSheet.absoluteFill}>
-            {parsed.edges.map((edge, i) => {
-              const from = byId.get(edge.from);
-              const to = byId.get(edge.to);
-              if (!from || !to) return null;
-              return (
-                <Path
-                  key={i}
-                  d={edgePath(from, to, parsed.direction)}
-                  stroke={colors.textSecondary}
-                  strokeWidth={1.5}
-                  fill="none"
-                />
-              );
-            })}
-          </Svg>
-          {laidOut.nodes.map((node) => (
-            <View key={node.id} style={[styles.node, { left: node.x, top: node.y }]}>
-              <Text style={styles.nodeLabel} numberOfLines={3}>
-                {node.label}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </ViewShot>
+      <View style={styles.canvasOuter}>
+        <ViewShot ref={shotRef} options={{ format: "png", result: "base64" }}>
+          <View style={[styles.canvas, { width: laidOut.width + spacing.md * 2, height: laidOut.height + spacing.md * 2 }]}>
+            <Svg
+              width={laidOut.width}
+              height={laidOut.height}
+              style={{ position: "absolute", left: spacing.md, top: spacing.md }}
+            >
+              {parsed.edges.map((edge, i) => {
+                const from = byId.get(edge.from);
+                const to = byId.get(edge.to);
+                if (!from || !to) return null;
+                return (
+                  <Path
+                    key={i}
+                    d={edgePath(from, to, parsed.direction)}
+                    stroke={colors.textSecondary}
+                    strokeWidth={1.5}
+                    fill="none"
+                  />
+                );
+              })}
+            </Svg>
+            {laidOut.nodes.map((node) => (
+              <View key={node.id} style={[styles.node, { left: node.x + spacing.md, top: node.y + spacing.md }]}>
+                <Text style={styles.nodeLabel} numberOfLines={3}>
+                  {node.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </ViewShot>
+      </View>
     </View>
   );
 }
@@ -357,21 +362,16 @@ function createStyles(colors: ColorPalette) {
     header: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "space-between",
+      justifyContent: "flex-end",
       paddingHorizontal: spacing.sm,
       paddingTop: spacing.xs,
     },
-    headerLabel: {
-      color: colors.textSecondary,
-      fontFamily: "monospace",
-      fontSize: 11,
-      textTransform: "lowercase",
-    },
     copyButton: { flexDirection: "row", alignItems: "center", gap: spacing.xs, padding: spacing.xs },
     copiedLabel: { color: colors.running, fontSize: 11, fontWeight: "600" },
-    canvas: {
-      padding: spacing.md,
+    canvasOuter: {
+      alignItems: "center",
     },
+    canvas: {},
     node: {
       position: "absolute",
       width: NODE_W,
