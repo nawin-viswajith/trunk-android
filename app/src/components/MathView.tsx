@@ -15,8 +15,15 @@ interface MathViewProps {
  * previous WebView+KaTeX approach rendered some formulas (e.g. \sqrt, which
  * KaTeX draws as SVG path glyphs) as blank boxes on real Android devices,
  * and a WebView per math block in a scrolling chat list is its own memory
- * problem; this component sidesteps both by never spinning up a WebView. A
- * render that throws (e.g. a macro MathJax doesn't support) falls back to
+ * problem; this component sidesteps both by never spinning up a WebView.
+ *
+ * `latex` is the bare formula body (MarkdownText.tsx has already stripped
+ * the \[ \]/\( \)/$$ $$ wrapper the model used) - MathJaxSvg's TeX input
+ * only activates math mode inside a delimiter pair, so it has to be
+ * re-wrapped here or every macro (\sqrt, \int, \frac, \sum, ...) renders as
+ * literal dead text instead of being parsed at all.
+ *
+ * A render that throws (e.g. a macro MathJax doesn't support) falls back to
  * raw LaTeX text, and a toggle lets the user switch to raw text regardless. */
 export function MathView({ latex, displayMode }: MathViewProps) {
   const colors = useColors();
@@ -25,6 +32,7 @@ export function MathView({ latex, displayMode }: MathViewProps) {
   const [renderFailed, setRenderFailed] = useState(false);
 
   const displayingRaw = showRaw || renderFailed;
+  const delimited = `$$${latex}$$`;
 
   return (
     <View style={[styles.wrap, displayMode && styles.wrapDisplay]}>
@@ -35,7 +43,7 @@ export function MathView({ latex, displayMode }: MathViewProps) {
       ) : (
         <MathErrorBoundary onError={() => setRenderFailed(true)}>
           <MathJaxSvg fontSize={17} color={colors.textPrimary} fontCache={false}>
-            {latex}
+            {delimited}
           </MathJaxSvg>
         </MathErrorBoundary>
       )}
