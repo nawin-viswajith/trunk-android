@@ -2,7 +2,7 @@
   "expo": {
     "name": "Trunk",
     "slug": "trunk",
-    "version": "1.3.7a",
+    "version": "1.3.7b",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",

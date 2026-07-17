@@ -116,11 +116,49 @@ function parseLine(line: string, nodes: Map<string, FlowNode>, edges: FlowEdge[]
  * app's sharp-corners-only design language. Returns null if the input
  * doesn't look like a flowchart at all, so the caller can fall back to a
  * plain code block. */
+// Counts unclosed [ ( { on a line so a node label a model wrapped across a
+// real newline (`C[Retrieve LLM\nConfiguration]`) can be rejoined into one
+// logical line before parsing - a bracket opened but not yet closed means
+// the line's label text continues on the next one, not that the line is
+// malformed.
+function unclosedBracketCount(line: string): number {
+  let depth = 0;
+  for (const ch of line) {
+    if (ch === "[" || ch === "(" || ch === "{") depth++;
+    else if (ch === "]" || ch === ")" || ch === "}") depth--;
+  }
+  return depth;
+}
+
+/** Rejoins any line left with unclosed brackets onto the next line (with a
+ * single space, so the label reads as one phrase) - repeated until every
+ * line balances, so a label wrapped across more than two lines still works. */
+function rejoinWrappedLabels(rawLines: string[]): string[] {
+  const joined: string[] = [];
+  let pending = "";
+  let pendingDepth = 0;
+  for (const line of rawLines) {
+    const combined = pending ? `${pending} ${line}` : line;
+    pendingDepth += unclosedBracketCount(line);
+    if (pendingDepth > 0) {
+      pending = combined;
+      continue;
+    }
+    joined.push(combined);
+    pending = "";
+    pendingDepth = 0;
+  }
+  if (pending) joined.push(pending);
+  return joined;
+}
+
 export function parseFlowchart(source: string): ParsedFlowchart | null {
-  const lines = source
-    .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith("%%"));
+  const lines = rejoinWrappedLabels(
+    source
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !l.startsWith("%%"))
+  );
   if (lines.length === 0) return null;
 
   const headerMatch = HEADER_REGEX.exec(lines[0]);
@@ -132,10 +170,18 @@ export function parseFlowchart(source: string): ParsedFlowchart | null {
   const edges: FlowEdge[] = [];
 
   for (const line of lines.slice(1)) {
+    if (parseLine(line, nodes, edges)) continue;
     // A line that parses as neither an edge chain nor a standalone node
-    // declaration means this isn't the small subset we support - bail out
-    // entirely rather than silently drop content the model actually wrote.
-    if (!parseLine(line, nodes, edges)) return null;
+    // declaration means this isn't the small subset we support. Bail out
+    // entirely (silently dropping nothing) UNLESS at least one real edge
+    // has already been parsed - models sometimes append a plain-text
+    // legend/summary after a complete, valid diagram (e.g. "[Step 1] -
+    // Start" lines restating each node), which isn't valid mermaid syntax
+    // but also isn't information the diagram itself would lose by ignoring
+    // it. Stop parsing at that point rather than discarding the diagram
+    // that already rendered correctly.
+    if (edges.length > 0) break;
+    return null;
   }
 
   if (nodes.size === 0) return null;
