@@ -1,7 +1,10 @@
-import React, { useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
+import ViewShot from "react-native-view-shot";
+import * as Clipboard from "expo-clipboard";
 import { Text } from "./Text";
+import { CopyIcon } from "./CopyIcon";
 import { ColorPalette, spacing } from "../theme/colors";
 import { useColors } from "../theme/ThemeContext";
 
@@ -288,38 +291,57 @@ export function FlowchartView({ source }: FlowchartViewProps) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const parsed = useMemo(() => parseFlowchart(source), [source]);
   const laidOut = useMemo(() => (parsed ? layout(parsed) : null), [parsed]);
+  const shotRef = useRef<ViewShot>(null);
+  const [copied, setCopied] = useState(false);
 
   if (!parsed || !laidOut) return null;
 
   const byId = new Map(laidOut.nodes.map((n) => [n.id, n]));
 
+  const onCopy = async () => {
+    const base64 = await shotRef.current?.capture?.();
+    if (!base64) return;
+    await Clipboard.setImageAsync(base64);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1200);
+  };
+
   return (
     <View style={styles.wrap}>
-      <View style={{ width: laidOut.width, height: laidOut.height }}>
-        <Svg width={laidOut.width} height={laidOut.height} style={StyleSheet.absoluteFill}>
-          {parsed.edges.map((edge, i) => {
-            const from = byId.get(edge.from);
-            const to = byId.get(edge.to);
-            if (!from || !to) return null;
-            return (
-              <Path
-                key={i}
-                d={edgePath(from, to, parsed.direction)}
-                stroke={colors.textSecondary}
-                strokeWidth={1.5}
-                fill="none"
-              />
-            );
-          })}
-        </Svg>
-        {laidOut.nodes.map((node) => (
-          <View key={node.id} style={[styles.node, { left: node.x, top: node.y }]}>
-            <Text style={styles.nodeLabel} numberOfLines={3}>
-              {node.label}
-            </Text>
-          </View>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.headerLabel}>flowchart</Text>
+        <Pressable onPress={onCopy} hitSlop={10} style={styles.copyButton}>
+          <CopyIcon color={colors.textSecondary} size={14} />
+          {copied ? <Text style={styles.copiedLabel}>Copied</Text> : null}
+        </Pressable>
       </View>
+      <ViewShot ref={shotRef} options={{ format: "png", result: "base64" }}>
+        <View style={[styles.canvas, { width: laidOut.width, height: laidOut.height }]}>
+          <Svg width={laidOut.width} height={laidOut.height} style={StyleSheet.absoluteFill}>
+            {parsed.edges.map((edge, i) => {
+              const from = byId.get(edge.from);
+              const to = byId.get(edge.to);
+              if (!from || !to) return null;
+              return (
+                <Path
+                  key={i}
+                  d={edgePath(from, to, parsed.direction)}
+                  stroke={colors.textSecondary}
+                  strokeWidth={1.5}
+                  fill="none"
+                />
+              );
+            })}
+          </Svg>
+          {laidOut.nodes.map((node) => (
+            <View key={node.id} style={[styles.node, { left: node.x, top: node.y }]}>
+              <Text style={styles.nodeLabel} numberOfLines={3}>
+                {node.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </ViewShot>
     </View>
   );
 }
@@ -330,8 +352,25 @@ function createStyles(colors: ColorPalette) {
       borderWidth: 1,
       borderColor: colors.border,
       backgroundColor: colors.surface,
-      padding: spacing.md,
       marginVertical: spacing.xs,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: spacing.sm,
+      paddingTop: spacing.xs,
+    },
+    headerLabel: {
+      color: colors.textSecondary,
+      fontFamily: "monospace",
+      fontSize: 11,
+      textTransform: "lowercase",
+    },
+    copyButton: { flexDirection: "row", alignItems: "center", gap: spacing.xs, padding: spacing.xs },
+    copiedLabel: { color: colors.running, fontSize: 11, fontWeight: "600" },
+    canvas: {
+      padding: spacing.md,
     },
     node: {
       position: "absolute",
