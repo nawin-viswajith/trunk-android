@@ -7,6 +7,7 @@ export interface ReleaseNote {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+  { version: "1.3.7f", summary: "Added a \"Back up downloads\" setting (Settings > Downloads) that copies each downloaded model to a folder you pick, so it survives uninstalling the app. Added a copy button under every assistant response in chat." },
   { version: "1.3.7e", summary: "Flowchart diagrams are now centered with proper spacing around every box, and dropped the redundant \"flowchart\" label. The raw-text toggle on math and the copy button on flowcharts now sit at the right edge to match code blocks." },
   { version: "1.3.7d", summary: "Fixed math formulas with symbols like square roots, integrals, fractions, summation, and partial derivatives rendering as plain text instead of proper math notation." },
   { version: "1.3.7c", summary: "Math rendering switched from a WebView (which rendered some formulas as blank boxes on-device) to a direct-to-SVG renderer, with a Show raw/rendered toggle as a fallback. Fixed Mermaid flowcharts not rendering when a node label wrapped across multiple lines. Flowcharts now have a copy button that copies the diagram as an image." },

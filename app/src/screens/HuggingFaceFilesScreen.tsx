@@ -9,7 +9,7 @@ import { useColors } from "../theme/ThemeContext";
 import { huggingfaceApi, HfFileSummary } from "../api/huggingface";
 import { HfModelSummary } from "../api/types";
 import { checkCompatibility, CompatibilityInfo } from "../utils/compatibility";
-import { downloadModel, isModelDownloaded, getModelSource, recordModelSource } from "../services/modelStorage";
+import { downloadModel, isModelDownloaded, getModelSource, recordModelSource, maybeBackupModel } from "../services/modelStorage";
 import { canProceedWithDownload } from "../services/downloadPolicy";
 import { formatBytes } from "../utils/format";
 import { showAlert } from "../state/useAlertStore";
@@ -124,6 +124,7 @@ export function HuggingFaceFilesScreen({ route, navigation }: any) {
         stopTrackingDownload(file.filename);
         useDownloadStore.getState().clearDownload(file.filename);
         await recordModelSource(file.filename, repoId);
+        await maybeBackupModel(file.filename);
         await load();
         showAlert(
           "Download complete",

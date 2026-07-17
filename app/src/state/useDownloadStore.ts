@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { downloadModel } from "../services/modelStorage";
+import { downloadModel, maybeBackupModel } from "../services/modelStorage";
 
 export type DownloadStatus = "downloading" | "failed";
 
@@ -107,9 +107,10 @@ export function retryFailedDownload(filename: string): void {
   });
   useDownloadStore.getState().beginDownload(filename, entry.url, entry.sizeBytes, handle.cancel);
   handle.done
-    .then(() => {
+    .then(async () => {
       stopTrackingDownload(filename);
       useDownloadStore.getState().clearDownload(filename);
+      await maybeBackupModel(filename);
     })
     .catch((err) => {
       stopTrackingDownload(filename);

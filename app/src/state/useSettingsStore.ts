@@ -78,6 +78,17 @@ interface SettingsState {
   /** Once true, the one-time "crash reporting is now on" notice never shows
    * again — shown once after updating to the version that introduced it. */
   crashReportingNoticeSeen: boolean;
+  /** Off by default (opt-in): whether a successful model download also gets
+   * copied to backupFolderUri, so the model survives an app uninstall.
+   * Android's scoped storage means llama.rn still loads models from app
+   * storage either way (see modelStorage.ts) - this is a secondary durable
+   * copy, not a change of where models actually live. */
+  backupDownloadsEnabled: boolean;
+  /** SAF (Storage Access Framework) directory URI granted via
+   * requestDirectoryPermissionsAsync() - null until the user has picked a
+   * folder at least once. Kept even if backupDownloadsEnabled is later
+   * turned off, so re-enabling doesn't need the picker again. */
+  backupFolderUri: string | null;
   setBackendUrl: (url: string) => void;
   setThemeMode: (mode: ThemeMode) => void;
   setDarkContrast: (contrast: DarkContrast) => void;
@@ -104,6 +115,8 @@ interface SettingsState {
   setLogConsentSeen: (value: boolean) => void;
   setCrashReportingEnabled: (value: boolean) => void;
   setCrashReportingNoticeSeen: (value: boolean) => void;
+  setBackupDownloadsEnabled: (value: boolean) => void;
+  setBackupFolderUri: (uri: string | null) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -132,6 +145,8 @@ export const useSettingsStore = create<SettingsState>()(
       logConsentSeen: false,
       crashReportingEnabled: true,
       crashReportingNoticeSeen: false,
+      backupDownloadsEnabled: false,
+      backupFolderUri: null,
       setBackendUrl: (url) => set({ backendUrl: url }),
       setThemeMode: (mode) => set({ themeMode: mode }),
       setDarkContrast: (contrast) => set({ darkContrast: contrast }),
@@ -160,6 +175,8 @@ export const useSettingsStore = create<SettingsState>()(
       setLogConsentSeen: (value) => set({ logConsentSeen: value }),
       setCrashReportingEnabled: (value) => set({ crashReportingEnabled: value }),
       setCrashReportingNoticeSeen: (value) => set({ crashReportingNoticeSeen: value }),
+      setBackupDownloadsEnabled: (value) => set({ backupDownloadsEnabled: value }),
+      setBackupFolderUri: (uri) => set({ backupFolderUri: uri }),
     }),
     {
       name: "pocketcoder-settings",

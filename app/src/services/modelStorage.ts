@@ -3,6 +3,7 @@ import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { quantFromFilename } from "../utils/quant";
 import { useDownloadStore } from "../state/useDownloadStore";
+import { useSettingsStore } from "../state/useSettingsStore";
 
 export interface LocalModel {
   filename: string;
@@ -104,6 +105,45 @@ export async function exportModelToDevice(filename: string): Promise<boolean> {
   );
   await FileSystem.StorageAccessFramework.copyAsync({ from: modelPath(filename), to: destUri });
   return true;
+}
+
+/** One-time grant for the "back up downloads" setting - same SAF picker as
+ * exportModelToDevice, but the resulting directoryUri is persisted
+ * (useSettingsStore) so later downloads can reuse it without prompting
+ * again. Returns null if the user cancelled the picker. */
+export async function pickBackupFolder(): Promise<string | null> {
+  const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+  return permissions.granted ? permissions.directoryUri : null;
+}
+
+/** Copies a just-downloaded model into the user-granted backup folder so it
+ * survives an app uninstall - Android's scoped storage means llama.rn still
+ * has to load models from this app's own storage (a content:// SAF URI
+ * isn't a path initLlama can open), so this is a secondary durable copy, not
+ * a relocation. Failures are swallowed (logged to console only): a backup
+ * copy failing shouldn't surface as a "download failed" error to the user
+ * when the actual download to app storage already succeeded. */
+async function backupModel(filename: string, directoryUri: string): Promise<void> {
+  try {
+    const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+      directoryUri,
+      filename,
+      "application/octet-stream"
+    );
+    await FileSystem.StorageAccessFramework.copyAsync({ from: modelPath(filename), to: destUri });
+  } catch (err) {
+    console.warn(`Backup copy failed for ${filename}:`, err);
+  }
+}
+
+/** Called from every successful-download path (initial download in
+ * HuggingFaceFilesScreen, retry in useDownloadStore) instead of duplicating
+ * the enabled-check + folder-uri lookup at each call site. No-ops silently
+ * if the setting is off or no folder has been granted yet. */
+export async function maybeBackupModel(filename: string): Promise<void> {
+  const { backupDownloadsEnabled, backupFolderUri } = useSettingsStore.getState();
+  if (!backupDownloadsEnabled || !backupFolderUri) return;
+  await backupModel(filename, backupFolderUri);
 }
 
 const MODEL_SOURCES_KEY = "pocketcoder-model-sources";

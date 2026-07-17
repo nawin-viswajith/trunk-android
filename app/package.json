@@ -1,6 +1,6 @@
 {
   "name": "app",
-  "version": "1.3.7e",
+  "version": "1.3.7f",
   "main": "index.ts",
   "dependencies": {
     "@expo-google-fonts/iceland": "^0.4.1",
